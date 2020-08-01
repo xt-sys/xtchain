@@ -1,0 +1,364 @@
+diff -apurN a/mingw-w64-tools/widl/src/header.c b/mingw-w64-tools/widl/src/header.c
+--- a/mingw-w64-tools/widl/src/header.c	2020-08-01 22:51:29.248778551 +0200
++++ b/mingw-w64-tools/widl/src/header.c	2020-08-01 21:41:41.998028252 +0200
+@@ -1221,7 +1221,7 @@ static void write_inline_wrappers(FILE *
+     if (!is_callas(func->attrs)) {
+       const var_t *arg;
+ 
+-      fprintf(header, "static FORCEINLINE ");
++      fprintf(header, "FORCEINLINE ");
+       write_type_decl_left(header, type_function_get_ret(func->declspec.type));
+       fprintf(header, " %s_%s(", name, get_name(func));
+       write_args(header, type_function_get_args(func->declspec.type), name, 1, FALSE);
+@@ -1256,7 +1256,16 @@ static void do_write_c_method_def(FILE *
+ 
+   if (type_iface_get_inherit(iface))
+     do_write_c_method_def(header, type_iface_get_inherit(iface), name);
+-
++  else if (type_iface_get_stmts(iface) == NULL)
++  {
++    fprintf(header, "#ifndef __cplusplus\n");
++    indent(header, 0);
++    fprintf(header, "char dummy;\n");
++    fprintf(header, "#endif\n");
++    fprintf(header, "\n");
++    return;
++  }
++  
+   STATEMENTS_FOR_EACH_FUNC(stmt, type_iface_get_stmts(iface))
+   {
+     const var_t *func = stmt->u.var;
+@@ -1804,6 +1813,11 @@ void write_header(const statement_list_t
+   fprintf(header, "#ifndef __REQUIRED_RPCNDR_H_VERSION__\n");
+   fprintf(header, "#define __REQUIRED_RPCNDR_H_VERSION__ 475\n");
+   fprintf(header, "#endif\n");
++
++  fprintf(header, "#ifdef __REACTOS__\n");
++  fprintf(header, "#define WIN32_LEAN_AND_MEAN\n");
++  fprintf(header, "#endif\n\n");
++
+   fprintf(header, "#include <rpc.h>\n" );
+   fprintf(header, "#include <rpcndr.h>\n" );
+   if (!for_each_serializable(stmts, NULL, serializable_exists))
+diff -apurN a/mingw-w64-tools/widl/src/parser.tab.c b/mingw-w64-tools/widl/src/parser.tab.c
+--- a/mingw-w64-tools/widl/src/parser.tab.c	2020-08-01 22:51:29.249778547 +0200
++++ b/mingw-w64-tools/widl/src/parser.tab.c	2020-08-01 22:55:45.839676740 +0200
+@@ -196,8 +196,6 @@ static struct namespace global_namespace
+ 
+ static struct namespace *current_namespace = &global_namespace;
+ 
+-static typelib_t *current_typelib;
+-
+ 
+ #line 203 "parser.tab.c" /* yacc.c:339  */
+ 
+@@ -2612,7 +2610,6 @@ yyreduce:
+ 						  write_client((yyvsp[-1].stmt_list));
+ 						  write_server((yyvsp[-1].stmt_list));
+ 						  write_regscript((yyvsp[-1].stmt_list));
+-						  write_typelib_regscript((yyvsp[-1].stmt_list));
+ 						  write_dlldata((yyvsp[-1].stmt_list));
+ 						  write_local_stubs((yyvsp[-1].stmt_list));
+ 						}
+@@ -2893,7 +2890,7 @@ yyreduce:
+ 
+   case 52:
+ #line 424 "parser.y" /* yacc.c:1651  */
+-    { (yyval.str) = (yyvsp[-2].str); if(!parse_only) add_importlib((yyvsp[-2].str), current_typelib); }
++    { (yyval.str) = (yyvsp[-2].str); if(!parse_only) add_importlib((yyvsp[-2].str)); }
+ #line 2898 "parser.tab.c" /* yacc.c:1651  */
+     break;
+ 
+@@ -2912,7 +2909,7 @@ yyreduce:
+   case 55:
+ #line 430 "parser.y" /* yacc.c:1651  */
+     { (yyval.typelib) = make_library((yyvsp[-1].str), check_library_attrs((yyvsp[-1].str), (yyvsp[-2].attr_list)));
+-						  if (!parse_only && do_typelib) current_typelib = (yyval.typelib);
++						  if (!parse_only) start_typelib(yyval.typelib);
+ 						}
+ #line 2918 "parser.tab.c" /* yacc.c:1651  */
+     break;
+@@ -6019,6 +6016,12 @@ static type_t *reg_typedefs(decl_spec_t
+         type->attrs = attrs;
+   }
+ 
++  /* Append the SWITCHTYPE attribute to a non-encapsulated union if it does not already have it */
++  if (type_get_type_detect_alias(type) == TYPE_UNION &&
++      is_attr(attrs, ATTR_SWITCHTYPE) &&
++      !is_attr(type->attrs, ATTR_SWITCHTYPE))
++    type->attrs = append_attr(type->attrs, make_attrp(ATTR_SWITCHTYPE, get_attrp(attrs, ATTR_SWITCHTYPE)));
++
+   LIST_FOR_EACH_ENTRY( decl, decls, declarator_t, entry )
+   {
+ 
+diff -apurN a/mingw-w64-tools/widl/src/parser.y b/mingw-w64-tools/widl/src/parser.y
+--- a/mingw-w64-tools/widl/src/parser.y	2020-08-01 22:51:29.250778543 +0200
++++ b/mingw-w64-tools/widl/src/parser.y	2020-08-01 21:48:30.318245917 +0200
+@@ -123,8 +123,6 @@ static struct namespace global_namespace
+ 
+ static struct namespace *current_namespace = &global_namespace;
+ 
+-static typelib_t *current_typelib;
+-
+ %}
+ %union {
+ 	attr_t *attr;
+@@ -320,7 +318,6 @@ input: gbl_statements m_acf			{ check_st
+ 						  write_client($1);
+ 						  write_server($1);
+ 						  write_regscript($1);
+-						  write_typelib_regscript($1);
+ 						  write_dlldata($1);
+ 						  write_local_stubs($1);
+ 						}
+@@ -421,18 +418,18 @@ import: import_start imp_statements aEOF
+ 	;
+ 
+ importlib: tIMPORTLIB '(' aSTRING ')'
+-	   semicolon_opt			{ $$ = $3; if(!parse_only) add_importlib($3, current_typelib); }
++	   semicolon_opt			{ $$ = $3; if(!parse_only) add_importlib($3); }
+ 	;
+ 
+ libraryhdr: tLIBRARY aIDENTIFIER		{ $$ = $2; }
+ 	|   tLIBRARY aKNOWNTYPE			{ $$ = $2; }
+ 	;
+ library_start: attributes libraryhdr '{'	{ $$ = make_library($2, check_library_attrs($2, $1));
+-						  if (!parse_only && do_typelib) current_typelib = $$;
++						  if (!parse_only) start_typelib($$);
+ 						}
+ 	;
+ librarydef: library_start imp_statements '}'
+-	    semicolon_opt			{ $$ = $1; $$->stmts = $2; }
++	    semicolon_opt			{ $$ = $1; $$->stmts = $2; if (!parse_only) end_typelib(); }
+ 	;
+ 
+ m_args:						{ $$ = NULL; }
+@@ -1906,6 +1903,12 @@ static type_t *reg_typedefs(decl_spec_t
+         type->attrs = attrs;
+   }
+ 
++  /* Append the SWITCHTYPE attribute to a non-encapsulated union if it does not already have it. */
++  if (type_get_type_detect_alias(type) == TYPE_UNION &&
++      is_attr(attrs, ATTR_SWITCHTYPE) &&
++      !is_attr(type->attrs, ATTR_SWITCHTYPE))
++    type->attrs = append_attr(type->attrs, make_attrp(ATTR_SWITCHTYPE, get_attrp(attrs, ATTR_SWITCHTYPE)));
++
+   LIST_FOR_EACH_ENTRY( decl, decls, declarator_t, entry )
+   {
+ 
+diff -apurN a/mingw-w64-tools/widl/src/proxy.c b/mingw-w64-tools/widl/src/proxy.c
+--- a/mingw-w64-tools/widl/src/proxy.c	2020-08-01 22:51:29.079779285 +0200
++++ b/mingw-w64-tools/widl/src/proxy.c	2020-08-01 22:56:14.230555312 +0200
+@@ -88,6 +88,12 @@ static void init_proxy(const statement_l
+   print_proxy( "/*** Autogenerated by WIDL %s from %s - Do not edit ***/\n", PACKAGE_VERSION, input_name);
+   print_proxy( "\n");
+   print_proxy( "#define __midl_proxy\n");
++
++  print_proxy( "#ifdef __REACTOS__\n");
++  print_proxy( "#define WIN32_NO_STATUS\n");
++  print_proxy( "#define WIN32_LEAN_AND_MEAN\n");
++  print_proxy( "#endif\n\n");
++
+   print_proxy( "#include \"objbase.h\"\n");
+   print_proxy( "\n");
+   print_proxy( "#ifndef DECLSPEC_HIDDEN\n");
+@@ -482,14 +488,15 @@ static const statement_t * get_callas_so
+   return NULL;
+ }
+ 
+-static void write_proxy_procformatstring_offsets( const type_t *iface, int skip )
++static int write_proxy_procformatstring_offsets( const type_t *iface, int skip )
+ {
+     const statement_t *stmt;
++    int i;
+ 
+     if (type_iface_get_inherit(iface))
+-        write_proxy_procformatstring_offsets( type_iface_get_inherit(iface), need_delegation(iface));
++        i = write_proxy_procformatstring_offsets( type_iface_get_inherit(iface), need_delegation(iface));
+     else
+-        return;
++        return 0;
+ 
+     STATEMENTS_FOR_EACH_FUNC( stmt, type_iface_get_stmts(iface) )
+     {
+@@ -509,7 +516,9 @@ static void write_proxy_procformatstring
+             print_proxy( "(unsigned short)-1,  /* %s::%s */\n", iface->name, get_name(func));
+         else
+             print_proxy( "%u,  /* %s::%s */\n", func->procstring_offset, iface->name, get_name(func));
++        i++;
+     }
++    return i;
+ }
+ 
+ static int write_proxy_methods(type_t *iface, int skip)
+@@ -643,7 +652,10 @@ static void write_proxy(type_t *iface, u
+   print_proxy( "static const unsigned short %s_FormatStringOffsetTable[] =\n", iface->name );
+   print_proxy( "{\n" );
+   indent++;
+-  write_proxy_procformatstring_offsets( iface, 0 );
++  if (write_proxy_procformatstring_offsets( iface, 0 ) == 0)
++  {
++    print_proxy( "0\n" );
++  }
+   indent--;
+   print_proxy( "};\n\n" );
+ 
+@@ -718,7 +730,10 @@ static void write_proxy(type_t *iface, u
+       print_proxy( "static const PRPC_STUB_FUNCTION %s_table[] =\n", iface->name);
+       print_proxy( "{\n");
+       indent++;
+-      write_stub_methods(iface, FALSE);
++      if (write_stub_methods(iface, FALSE) == 0)
++      {
++        fprintf(proxy, 0);
++      }
+       fprintf(proxy, "\n");
+       indent--;
+       fprintf(proxy, "};\n\n");
+diff -apurN a/mingw-w64-tools/widl/src/register.c b/mingw-w64-tools/widl/src/register.c
+--- a/mingw-w64-tools/widl/src/register.c	2020-08-01 22:52:08.525607975 +0200
++++ b/mingw-w64-tools/widl/src/register.c	2020-08-01 22:56:25.382507605 +0200
+@@ -324,6 +324,9 @@ void output_typelib_regscript( const typ
+     put_str( indent++, "{\n" );
+     expr = get_attrp( typelib->attrs, ATTR_ID );
+     if (expr)
++        sprintf(id_part, "\\%d", expr->cval);
++    
++    if (expr)
+     {
+         sprintf(id_part, "\\%d", expr->cval);
+         resname = xmalloc( strlen(typelib_name) + 20 );
+@@ -349,5 +352,5 @@ void output_typelib_regscript( const typ
+     write_progids( typelib->stmts );
+     put_str( --indent, "}\n" );
+ 
+-    add_output_to_resources( "WINE_REGISTRY", resname );
++    add_output_to_resources( "WINE_REGISTRY", typelib_name );
+ }
+diff -apurN a/mingw-w64-tools/widl/src/typegen.c b/mingw-w64-tools/widl/src/typegen.c
+--- a/mingw-w64-tools/widl/src/typegen.c	2020-08-01 22:51:29.250778543 +0200
++++ b/mingw-w64-tools/widl/src/typegen.c	2020-08-01 22:56:33.110474542 +0200
+@@ -4816,7 +4816,7 @@ void write_func_param_struct( FILE *file
+         if (align >= pointer_size)
+             fprintf( file, "%s;\n", arg->name );
+         else
+-            fprintf( file, "%s DECLSPEC_ALIGN(%u);\n", arg->name, pointer_size );
++            fprintf( file, "DECLSPEC_ALIGN(%u) %s;\n", pointer_size, arg->name );
+     }
+     if (add_retval && !is_void( retval->declspec.type ))
+     {
+diff -apurN a/mingw-w64-tools/widl/src/typelib.c b/mingw-w64-tools/widl/src/typelib.c
+--- a/mingw-w64-tools/widl/src/typelib.c	2020-08-01 22:51:29.080779281 +0200
++++ b/mingw-w64-tools/widl/src/typelib.c	2020-08-01 22:56:40.014445003 +0200
+@@ -44,6 +44,7 @@
+ #include "typelib_struct.h"
+ #include "typetree.h"
+ 
++static typelib_t *typelib;
+ 
+ /* List of oleauto types that should be recognized by name.
+  * (most of) these seem to be intrinsic types in mktyplib.
+@@ -239,6 +240,18 @@ unsigned short get_type_vt(type_t *t)
+   return 0;
+ }
+ 
++void start_typelib(typelib_t *typelib_type)
++{
++    if (!do_typelib) return;
++    typelib = typelib_type;
++}
++
++void end_typelib(void)
++{
++    if (!typelib) return;
++    create_msft_typelib(typelib);
++}
++
+ static void tlb_read(int fd, void *buf, int count)
+ {
+     if(read(fd, buf, count) < count)
+@@ -363,7 +376,7 @@ static void read_importlib(importlib_t *
+     close(fd);
+ }
+ 
+-void add_importlib(const char *name, typelib_t *typelib)
++void add_importlib(const char *name)
+ {
+     importlib_t *importlib;
+ 
+diff -apurN a/mingw-w64-tools/widl/src/typelib.h b/mingw-w64-tools/widl/src/typelib.h
+--- a/mingw-w64-tools/widl/src/typelib.h	2020-08-01 22:52:08.525607975 +0200
++++ b/mingw-w64-tools/widl/src/typelib.h	2020-08-01 22:56:45.782420322 +0200
+@@ -21,7 +21,9 @@
+ #ifndef __WIDL_TYPELIB_H
+ #define __WIDL_TYPELIB_H
+ 
+-extern void add_importlib(const char *name, typelib_t *typelib);
++extern void start_typelib(typelib_t *typelib_type);
++extern void end_typelib(void);
++extern void add_importlib(const char *name);
+ 
+ /* Copied from wtypes.h. Not included directly because that would create a
+  * circular dependency (after all, wtypes.h is generated by widl...) */
+diff -apurN a/mingw-w64-tools/widl/src/widl.c b/mingw-w64-tools/widl/src/widl.c
+--- a/mingw-w64-tools/widl/src/widl.c	2020-08-01 22:52:08.526607970 +0200
++++ b/mingw-w64-tools/widl/src/widl.c	2020-08-01 21:36:56.893265451 +0200
+@@ -388,6 +388,12 @@ static void write_dlldata_list(struct li
+   fprintf(dlldata, "- Do not edit ***/\n\n");
+   if (define_proxy_delegation)
+       fprintf(dlldata, "#define PROXY_DELEGATION\n");
++
++  fprintf(dlldata, "#ifdef __REACTOS__\n");
++  fprintf(dlldata, "#define WIN32_NO_STATUS\n");
++  fprintf(dlldata, "#define WIN32_LEAN_AND_MEAN\n");
++  fprintf(dlldata, "#endif\n\n");
++
+   fprintf(dlldata, "#include <objbase.h>\n");
+   fprintf(dlldata, "#include <rpcproxy.h>\n\n");
+   start_cplusplus_guard(dlldata);
+@@ -533,6 +539,12 @@ void write_id_data(const statement_list_
+ 
+   fprintf(idfile, "/*** Autogenerated by WIDL %s ", PACKAGE_VERSION);
+   fprintf(idfile, "from %s - Do not edit ***/\n\n", input_idl_name);
++
++  fprintf(idfile, "#ifdef __REACTOS__\n");
++  fprintf(idfile, "#define WIN32_NO_STATUS\n");
++  fprintf(idfile, "#define WIN32_LEAN_AND_MEAN\n");
++  fprintf(idfile, "#endif\n\n");
++
+   fprintf(idfile, "#include <rpc.h>\n");
+   fprintf(idfile, "#include <rpcndr.h>\n\n");
+ 
+diff -apurN a/mingw-w64-tools/widl/src/widl.h b/mingw-w64-tools/widl/src/widl.h
+--- a/mingw-w64-tools/widl/src/widl.h	2020-08-01 22:52:08.526607970 +0200
++++ b/mingw-w64-tools/widl/src/widl.h	2020-08-01 22:56:54.478383110 +0200
+@@ -96,7 +96,6 @@ extern void write_proxies(const statemen
+ extern void write_client(const statement_list_t *stmts);
+ extern void write_server(const statement_list_t *stmts);
+ extern void write_regscript(const statement_list_t *stmts);
+-extern void write_typelib_regscript(const statement_list_t *stmts);
+ extern void output_typelib_regscript( const typelib_t *typelib );
+ extern void write_local_stubs(const statement_list_t *stmts);
+ extern void write_dlldata(const statement_list_t *stmts);
+diff -apurN a/mingw-w64-tools/widl/src/write_msft.c b/mingw-w64-tools/widl/src/write_msft.c
+--- a/mingw-w64-tools/widl/src/write_msft.c	2020-08-01 22:51:29.252778534 +0200
++++ b/mingw-w64-tools/widl/src/write_msft.c	2020-08-01 21:39:46.785529130 +0200
+@@ -54,6 +54,10 @@
+ #include "parser.h"
+ #include "typegen.h"
+ 
++#define S_OK          0
++#define S_FALSE       1
++#define E_OUTOFMEMORY ((HRESULT)0x8007000EL)
++
+ enum MSFT_segment_index {
+     MSFT_SEG_TYPEINFO = 0,  /* type information */
+     MSFT_SEG_IMPORTINFO,    /* import information */
+@@ -2663,6 +2667,7 @@ static void save_all_changes(msft_typeli
+             sprintf( typelib_id, "#%d", expr->cval );
+         add_output_to_resources( "TYPELIB", typelib_id );
+         output_typelib_regscript( typelib->typelib );
++        flush_output_resources( typelib_name );
+     }
+     else flush_output_buffer( typelib_name );
+ }
