@@ -341,4 +341,4 @@ echo "${FBEVER}" > ${BINDIR}/Version
 
 # Prepare archive
 echo "Creating toolchain archive..."
-tar -I 'zstd -19' -cf fbe-${FBEVER}-linux.tar.zst -C ${BINDIR} .
+tar -I 'zstd -19' -cpf fbe-${FBEVER}-linux.tar.zst -C ${BINDIR} .
