@@ -41,4 +41,4 @@ export PFMAT3="\[\033[0;1;97;104m\]"
 export PFMAT4="\[\033[0;94;49m\]"
 export PFMAT5="\[\033[1;38;5;74m\]"
 export PROMPT="\n${PFMAT1} FerretOS BE ${PFMAT2}${PFMAT3} \w ${PFMAT4}${PFMAT5} "
-bash --rcfile <(echo 'export PS1="${PROMPT}" && source ~/.bashrc && cd ${SRCDIR}')
+bash --rcfile <(echo 'source ~/.bashrc && export PS1="${PROMPT}" && cd ${SRCDIR}')
