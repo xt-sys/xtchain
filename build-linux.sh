@@ -2,8 +2,9 @@
 set -e
 
 # Working Directories
-SRCDIR="$(pwd)/sources"
 BINDIR="$(pwd)/binaries"
+PCHDIR="$(pwd)/patches"
+SRCDIR="$(pwd)/sources"
 WRKDIR="$(pwd)"
 
 # Binutils Settings
@@ -36,9 +37,34 @@ ARCHS="i686 x86_64"
 GENERIC="generic-w64-mingw32"
 
 
+apply_patches()
+{
+    local PACKAGE="${1}"
+    local VERSION="${2}"
+    if [ -d "${PCHDIR}/${PACKAGE}/${VERSION}" ]; then
+        PATCHES="$(find ${PCHDIR}/${PACKAGE}/${VERSION} -name '*.diff' -o -name '*.patch' | sort -n)"
+        echo ">>> Applying custom patches ..."
+        for PATCH in ${PATCHES}; do
+            if [ -f "${PATCH}" ] && [ -r "${PATCH}" ]; then
+                for PREFIX in {0..5}; do
+                    if patch -i${PATCH} -p${PREFIX} --silent --dry-run >/dev/null; then
+                        patch -i${PATCH} -p${PREFIX} --silent
+                        echo ">>> Patch ${PATCH} applied ..."
+                        break;
+                    elif [ ${PREFIX} -ge 5 ]; then
+                        echo "Patch ${PATCH} does not fit. Failed applying patch ..."
+                        return 1
+                    fi
+                done
+            fi
+        done
+    fi
+}
+
 binutils_build()
 {
     for ARCH in ${ARCHS}; do
+        echo ">>> Building BINUTILS for ${ARCH} ..."
         [ -z ${CLEAN} ] || rm -rf ${BINUTILSDIR}/build-${ARCH}
         mkdir -p ${BINUTILSDIR}/build-${ARCH}
         cd ${BINUTILSDIR}/build-${ARCH}
@@ -61,15 +87,18 @@ binutils_build()
 binutils_fetch()
 {
     if [ ! -d ${BINUTILSDIR} ]; then
+        echo ">>> Downloading BINUTILS ..."
         git clone ${BINUTILSVCS} ${BINUTILSDIR}
         cd ${BINUTILSDIR}
         git checkout tags/${BINUTILSTAG}
+        apply_patches ${BINUTILSDIR##*/} ${BINUTILSTAG}
         cd ${WRKDIR}
     fi
 }
 
 cmake_build()
 {
+    echo ">>> Building CMAKE ..."
     [ -z ${CLEAN} ] || rm -rf ${CMAKEDIR}/build-${GENERIC}
     mkdir -p ${CMAKEDIR}/build-${GENERIC}
     cd ${CMAKEDIR}/build-${GENERIC}
@@ -85,9 +114,11 @@ cmake_build()
 cmake_fetch()
 {
     if [ ! -d ${CMAKEDIR} ]; then
+        echo ">>> Downloading CMAKE ..."
         git clone ${CMAKEVCS} ${CMAKEDIR}
         cd ${CMAKEDIR}
         git checkout tags/${CMAKETAG}
+        apply_patches ${CMAKEDIR##*/} ${CMAKETAG}
         cd ${WRKDIR}
     fi
 }
@@ -95,6 +126,7 @@ cmake_fetch()
 gcc_build_phase1()
 {
     for ARCH in ${ARCHS}; do
+        echo ">>> Building GCC (phase1) for ${ARCH} ..."
         [ -z ${CLEAN} ] || rm -rf ${GCCDIR}/build-${ARCH}
         mkdir -p ${GCCDIR}/build-${ARCH}
         cd ${GCCDIR}/build-${ARCH}
@@ -125,6 +157,7 @@ gcc_build_phase1()
 gcc_build_phase2()
 {
     for ARCH in ${ARCHS}; do
+        echo ">>> Building GCC (phase2) for ${ARCH} ..."
         cd ${GCCDIR}/build-${ARCH}
         make -j${CORES}
         make install
@@ -135,9 +168,11 @@ gcc_build_phase2()
 gcc_fetch()
 {
     if [ ! -d ${GCCDIR} ]; then
+        echo ">>> Downloading GCC ..."
         git clone ${GCCVCS} ${GCCDIR}
         cd ${GCCDIR}
         git checkout tags/${GCCTAG}
+        apply_patches ${GCCDIR##*/} ${GCCTAG##*/}
         ./contrib/download_prerequisites
         cd ${WRKDIR}
     fi
@@ -146,6 +181,7 @@ gcc_fetch()
 mingw_build_crt()
 {
     for ARCH in ${ARCHS}; do
+        echo ">>> Building Mingw-w64 (CRT) for ${ARCH} ..."
         [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
         mkdir -p ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
         cd ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
@@ -174,6 +210,7 @@ mingw_build_crt()
 
 mingw_build_headers()
 {
+    echo ">>> Building Mingw-w64 (headers) ..."
     [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
     mkdir -p ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
     cd ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
@@ -200,6 +237,7 @@ mingw_build_headers()
 mingw_build_libs()
 {
     for LIB in libmangle winstorecompat; do
+        echo ">>> Building Mingw-w64 (libs) for ${ARCH} ..."
         for ARCH in ${ARCHS}; do
             [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-libraries/${LIB}/build-${ARCH}
             mkdir -p ${MINGWDIR}/mingw-w64-libraries/${LIB}/build-${ARCH}
@@ -222,6 +260,7 @@ mingw_build_tools()
 {
     for TOOL in gendef genidl genlib genpeimg widl; do
         for ARCH in ${ARCHS}; do
+            echo ">>> Building Mingw-w64 (tools) for ${ARCH} ..."
             [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-tools/${TOOL}/build-${ARCH}
             mkdir -p ${MINGWDIR}/mingw-w64-tools/${TOOL}/build-${ARCH}
             cd ${MINGWDIR}/mingw-w64-tools/${TOOL}/build-${ARCH}
@@ -241,15 +280,18 @@ mingw_build_tools()
 mingw_fetch()
 {
     if [ ! -d ${MINGWDIR} ]; then
+        echo ">>> Downloading Mingw-w64 ..."
         git clone ${MINGWVCS} ${MINGWDIR}
         cd ${MINGWDIR}
         git checkout tags/${MINGWTAG}
+        apply_patches ${MINGWDIR##*/} ${MINGWTAG}
         cd ${WRKDIR}
     fi
 }
 
 ninja_build()
 {
+    echo ">>> Building NINJA ..."
     [ -z ${CLEAN} ] || rm -rf ${NINJADIR}/build-${GENERIC}
     mkdir -p ${NINJADIR}/build-${GENERIC}
     cd ${NINJADIR}/build-${GENERIC}
@@ -261,9 +303,11 @@ ninja_build()
 ninja_fetch()
 {
     if [ ! -d ${NINJADIR} ]; then
+        echo ">>> Downloading NINJA ..."
         git clone ${NINJAVCS} ${NINJADIR}
         cd ${NINJADIR}
         git checkout tags/${NINJATAG}
+        apply_patches ${NINJADIR##*/} ${NINJATAG}
         cd ${WRKDIR}
     fi
 }
@@ -326,11 +370,11 @@ ninja_fetch
 ninja_build
 
 # Remove unneeded files to save disk space
-echo "Removing unneeded files to save disk space..."
+echo ">>> Removing unneeded files to save disk space ..."
 rm -rf ${BINDIR}/{doc,include,mingw,share/{bash-completion,emacs,gcc*,info,man,vim}}
 
 # Copy all scripts
-echo "Copying scripts..."
+echo ">>> Copying scripts ..."
 cp -apf ${WRKDIR}/scripts/* ${BINDIR}/
 
 # Save FBE version
@@ -340,5 +384,5 @@ cd ${WRKDIR}
 echo "${FBEVER}" > ${BINDIR}/Version
 
 # Prepare archive
-echo "Creating toolchain archive..."
+echo ">>> Creating toolchain archive ..."
 tar -I 'zstd -19' -cpf fbe-${FBEVER}-linux.tar.zst -C ${BINDIR} .
