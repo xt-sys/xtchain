@@ -7,6 +7,10 @@ PCHDIR="$(pwd)/patches"
 SRCDIR="$(pwd)/sources"
 WRKDIR="$(pwd)"
 
+# Compiler Flags
+CFLAGS="-march=x86-64 -mtune=generic -O2 -s -pipe"
+CXXFLAGS="${CFLAGS}"
+
 # Binutils Settings
 BINUTILSDIR="${SRCDIR}/binutils"
 BINUTILSTAG="binutils-2_35"
@@ -327,6 +331,10 @@ fi
 # Create working directories
 mkdir -p ${BINDIR}
 mkdir -p ${SRCDIR}
+
+# Export compiler flags
+export CFLAGS
+export CXXFLAGS
 
 # Download Mingw-W64
 mingw_fetch
