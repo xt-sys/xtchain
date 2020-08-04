@@ -1,0 +1,36 @@
+Though GOLD is not yet enabled for TDM-GCC, this patch will help
+
+From: J.M. Eubank <john@thesnappy.net>
+
+From
+   <https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-binutils/0001-enable-gold-on.mingw32.patch>
+---
+ 0 files changed
+
+diff --git a/configure b/configure
+index 6a9719f6..f07a3b7f 100755
+--- a/configure
++++ b/configure
+@@ -3001,6 +3001,7 @@ case "${ENABLE_GOLD}" in
+   yes|default)
+     # Check for ELF target.
+     is_elf=no
++    is_pe=no
+     case "${target}" in
+       *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
+       | *-*-linux* | *-*-gnu* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
+@@ -3012,10 +3013,12 @@ case "${ENABLE_GOLD}" in
+           *)
+             is_elf=yes
+             ;;
+-        esac
++        esac;;
++      *-*-mingw*)
++        is_pe=yes;;
+     esac
+ 
+-    if test "$is_elf" = "yes"; then
++    if test "$is_elf" = "yes" -o "$is_pe" = "yes"; then
+       # Check for target supported by gold.
+       case "${target}" in
+         i?86-*-* | x86_64-*-* | sparc*-*-* | powerpc*-*-* | arm*-*-* \

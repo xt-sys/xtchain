@@ -76,6 +76,7 @@ binutils_build()
             --disable-multilib \
             --disable-nls \
             --disable-werror \
+            --enable-gold \
             --enable-lto \
             --enable-plugins
         make -j${CORES}
