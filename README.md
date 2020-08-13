@@ -17,7 +17,7 @@ This software includes:
  * Ninja
  * Wine
 
-This software is based on ["LLVM MinGW Toolchain"](https://github.com/mstorsjo/llvm-mingw).
+This software is based on [LLVM MinGW Toolchain](https://github.com/mstorsjo/llvm-mingw).
 
 ## Licensing
 The XTchain project includes the scripts for building and assembling a toolchain as well as wrappers
