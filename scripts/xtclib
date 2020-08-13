@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# PROJECT:     XTchain
+# LICENSE:     See the COPYING.md in the top level directory
+# FILE:        scripts/xtclib
+# DESCRIPTION: XTchain library
+# DEVELOPERS:  Rafal Kupiec <belliash@codingworkshop.eu.org>
+
+
+# Sets the target architecture
+charch()
+{
+    if [ "x${1}" == "x" ]; then
+        echo "Syntax: charch [architecture]"
+        return
+    fi
+    case ${1} in
+        "aarch64"|"arm64")
+            export TARGET="aarch64"
+            ;;
+        "arm"|"armv7")
+            export TARGET="armv7"
+            ;;
+        "i386"|"i486"|"i586"|"i686"|"x86")
+            export TARGET="i686"
+            ;;
+        "amd64"|"x64"|"x86_64")
+            export TARGET="amd64"
+            ;;
+        *)
+            export TARGET="UNKNOWN"
+    esac
+    echo "Target Architecture: ${TARGET}"
+}
+export -f charch
+
+# Displays version banner
+version()
+{
+    echo "###############################################################################"
+    echo "#                        XT Toolchain v${XTCVER} for Linux                          #"
+    echo "#               by Rafal Kupiec <belliash@codingworkshop.eu.org>              #"
+    echo "###############################################################################"
+    echo
+    echo
+    echo "LLVM Compiler Version: $(${XTCDIR}/bin/clang --version | grep 'clang version' | cut -d' ' -f3)"
+    echo "LLVM Windres Utility Version: $(${XTCDIR}/generic-w64-mingw32/bin/windres-wrapper -V | cut -d' ' -f7)"
+    echo "Mingw IDL Compiler Version: $(${XTCDIR}/bin/i686-w64-mingw32-widl -V | grep 'version' | cut -d' ' -f5)"
+    echo "Wine Message Compiler Version: $(${XTCDIR}/bin/wmc -V | grep 'version' | cut -d' ' -f5)"
+    echo "Wine Resource Compiler Version: $(${XTCDIR}/bin/wrc --version | grep 'version' | cut -d' ' -f5)"
+    echo
+    charch ${TARGET}
+    echo
+    echo
+}
+export -f version
