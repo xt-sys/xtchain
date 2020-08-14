@@ -561,6 +561,7 @@ xtchain_build()
     mkdir -p ${BINDIR}/${GENERIC}/bin
     cp ${WRKDIR}/scripts/*-wrapper ${BINDIR}/${GENERIC}/bin
     gcc ${WRKDIR}/tools/windres.c -o ${BINDIR}/bin/windres
+    gcc ${WRKDIR}/tools/xtcspecc.c -o ${BINDIR}/bin/xtcspecc
     cd ${BINDIR}/bin
     for ARCH in ${ARCHS}; do
         for EXEC in c++ c11 c99 cc clang clang++ g++ gcc; do
@@ -572,7 +573,7 @@ xtchain_build()
         for EXEC in dlltool ld objdump; do
             ln -sf ../${GENERIC}/bin/${EXEC}-wrapper ${ARCH}-w64-mingw32-${EXEC}
         done
-        for EXEC in windres; do
+        for EXEC in windres xtcspecc; do
             ln -sf ${EXEC} ${ARCH}-w64-mingw32-${EXEC}
         done
     done
