@@ -2,7 +2,7 @@ diff --git a/bfd/peXXigen.c b/bfd/peXXigen.c
 index 5149ef582b..f09e4b7382 100644
 --- a/bfd/peXXigen.c
 +++ b/bfd/peXXigen.c
-@@ -2952,6 +2952,22 @@ _bfd_XX_print_private_bfd_data_common (bfd * abfd, void * vfile)
+@@ -2952,6 +2952,25 @@ _bfd_XX_print_private_bfd_data_common (bfd * abfd, void * vfile)
      case IMAGE_SUBSYSTEM_XBOX:
        subsystem_name = "XBOX";
        break;
@@ -22,6 +22,9 @@ index 5149ef582b..f09e4b7382 100644
 +    case IMAGE_SUBSYSTEM_XT_PSXAPP:
 +      subsystem_name = "XT PSX application";
 +      break;
++    case IMAGE_SUBSYSTEM_XT_DYNLIB:
++      subsystem_name = "XT dynamic library"
++      break;
      /* Added default case for clarity - subsystem_name is NULL anyway.  */
      default:
        subsystem_name = NULL;
@@ -29,7 +32,7 @@ diff --git a/binutils/objcopy.c b/binutils/objcopy.c
 index 3866c7f458..55e069831b 100644
 --- a/binutils/objcopy.c
 +++ b/binutils/objcopy.c
-@@ -4860,7 +4860,12 @@ set_pe_subsystem (const char *s)
+@@ -4860,7 +4860,13 @@ set_pe_subsystem (const char *s)
        { "efi-bsd", 1, IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER },
        { "efi-rtd", 1, IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER },
        { "sal-rtd", 1, IMAGE_SUBSYSTEM_SAL_RUNTIME_DRIVER },
@@ -39,7 +42,8 @@ index 3866c7f458..55e069831b 100644
 +      { "xt-native", 0, IMAGE_SUBSYSTEM_XT_NATIVE },
 +      { "xt-gdiapp", 0, IMAGE_SUBSYSTEM_XT_GDIAPP },
 +      { "xt-cliapp", 0, IMAGE_SUBSYSTEM_XT_CLIAPP },
-+      { "xt-psxapp", 0, IMAGE_SUBSYSTEM_XT_PSXAPP }
++      { "xt-psxapp", 0, IMAGE_SUBSYSTEM_XT_PSXAPP },
++      { "xt-dynlib", 0, IMAGE_SUBSYSTEM_XT_DYNLIB }
      };
    short value;
    char *copy;
@@ -47,7 +51,7 @@ diff --git a/include/coff/pe.h b/include/coff/pe.h
 index c83a958eee..deeea6b49a 100644
 --- a/include/coff/pe.h
 +++ b/include/coff/pe.h
-@@ -169,6 +169,11 @@
+@@ -169,6 +169,12 @@
  #define IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER	12
  #define IMAGE_SUBSYSTEM_SAL_RUNTIME_DRIVER	13
  #define IMAGE_SUBSYSTEM_XBOX			14
@@ -56,6 +60,7 @@ index c83a958eee..deeea6b49a 100644
 +#define IMAGE_SUBSYSTEM_XT_GDIAPP       23
 +#define IMAGE_SUBSYSTEM_XT_CLIAPP       24
 +#define IMAGE_SUBSYSTEM_XT_PSXAPP       25
++#define IMAGE_SUBSYSTEM_XT_DYNLIB       26
  
  /* NT allows long filenames, we want to accommodate this.
     This may break some of the bfd functions.  */
@@ -63,7 +68,7 @@ diff --git a/ld/emultempl/pe.em b/ld/emultempl/pe.em
 index 3899c9d92c..c9277ded20 100644
 --- a/ld/emultempl/pe.em
 +++ b/ld/emultempl/pe.em
-@@ -539,6 +539,11 @@ set_entry_point (void)
+@@ -539,6 +539,12 @@ set_entry_point (void)
        { 7, "__PosixProcessStartup"},
        { 9, "WinMainCRTStartup" },
        {14, "mainCRTStartup"    },
@@ -72,10 +77,11 @@ index 3899c9d92c..c9277ded20 100644
 +      {23, "XtgMainProcessStartup" },
 +      {24, "XtcMainProcessStartup" },
 +      {25, "XtpMainProcessStartup" },
++      {26, "XtlMainLibraryStartup" },
        { 0, NULL          }
      };
  
-@@ -606,6 +611,11 @@ set_pe_subsystem (void)
+@@ -606,6 +611,12 @@ set_pe_subsystem (void)
        { "posix",   7},
        { "wince",   9},
        { "xbox",   14},
@@ -84,6 +90,7 @@ index 3899c9d92c..c9277ded20 100644
 +      { "xt-gdiapp", 23},
 +      { "xt-cliapp", 24},
 +      { "xt-psxapp", 25},
++      { "xt-dynlib", 26},
        { NULL, 0 }
      };
  
@@ -91,7 +98,7 @@ diff --git a/ld/emultempl/pep.em b/ld/emultempl/pep.em
 index a0a7023e70..001aa34769 100644
 --- a/ld/emultempl/pep.em
 +++ b/ld/emultempl/pep.em
-@@ -504,6 +504,11 @@ set_entry_point (void)
+@@ -504,6 +504,12 @@ set_entry_point (void)
        { 7, "__PosixProcessStartup" },
        { 9, "WinMainCRTStartup" },
        {14, "mainCRTStartup"    },
@@ -100,10 +107,11 @@ index a0a7023e70..001aa34769 100644
 +      {23, "XtgMainProcessStartup" },
 +      {24, "XtcMainProcessStartup" },
 +      {25, "XtpMainProcessStartup" },
++      {26, "XtlMainLibraryStartup" },
        { 0, NULL          }
      };
  
-@@ -568,6 +573,11 @@ set_pep_subsystem (void)
+@@ -568,6 +573,12 @@ set_pep_subsystem (void)
        { "posix",   7 },
        { "wince",   9 },
        { "xbox",   14 },
@@ -112,6 +120,7 @@ index a0a7023e70..001aa34769 100644
 +      { "xt-gdiapp", 23},
 +      { "xt-cliapp", 24},
 +      { "xt-psxapp", 25},
++      { "xt-dynlib", 26},
        { NULL, 0 }
      };
  
