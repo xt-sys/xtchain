@@ -177,7 +177,7 @@ gcc_fetch()
         git clone ${GCCVCS} ${GCCDIR}
         cd ${GCCDIR}
         git checkout tags/${GCCTAG}
-        apply_patches ${GCCDIR##*/} ${GCCTAG##*/}
+        apply_patches ${GCCDIR##*/} ${GCCTAG##*-}
         ./contrib/download_prerequisites
         cd ${WRKDIR}
     fi
