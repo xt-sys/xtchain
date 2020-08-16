@@ -96,7 +96,7 @@ binutils_fetch()
         git clone ${BINUTILSVCS} ${BINUTILSDIR}
         cd ${BINUTILSDIR}
         git checkout tags/${BINUTILSTAG}
-        apply_patches ${BINUTILSDIR##*/} ${BINUTILSTAG}
+        apply_patches ${BINUTILSDIR##*/} ${BINUTILSTAG##*-}
         cd ${WRKDIR}
     fi
 }
