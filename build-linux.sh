@@ -45,7 +45,7 @@ NINJAVCS="https://github.com/ninja-build/ninja.git"
 
 # Wine Settings
 WINEDIR="${SRCDIR}/wine"
-WINETAG="wine-5.14"
+WINETAG="wine-5.15"
 WINEVCS="git://source.winehq.org/git/wine.git"
 
 
