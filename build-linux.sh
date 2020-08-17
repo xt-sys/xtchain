@@ -42,9 +42,9 @@ MAKEVCS="git://git.savannah.gnu.org/make"
 
 # Mingw-w64 Settings
 MINGWDIR="${SRCDIR}/mingw-w64"
-MINGWLIB="msvcrt"
-MINGWTAG="v6.0.0"
-MINGWNTV="0x502"
+MINGWLIB="ucrt"
+MINGWTAG="v7.0.0"
+MINGWNTV="0x601"
 MINGWVCS="https://github.com/mirror/mingw-w64.git"
 
 # Ninja Settings
