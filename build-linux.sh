@@ -393,7 +393,8 @@ wine_build()
     mkdir -p ${WINEDIR}/build
     cd ${WINEDIR}/build
     ../configure \
-        -enable-win64
+        -enable-win64 \
+        --without-x
     for TOOL in winedump wmc wrc; do
         make -j${CORES} tools/${TOOL}
         cp tools/${TOOL}/${TOOL} ${BINDIR}/bin/
