@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# PROJECT:     XTchain
+# LICENSE:     See the COPYING.md in the top level directory
+# FILE:        scripts/xtclib
+# DESCRIPTION: XTchain library
+# DEVELOPERS:  Rafal Kupiec <belliash@codingworkshop.eu.org>
+
 
 # Sets the target architecture
 charch()
@@ -25,14 +31,17 @@ export -f charch
 version()
 {
     echo "###############################################################################"
-    echo "#                  FerretOS Build Environment v${FBEVER} for Linux                  #"
+    echo "#                  FerretOS Build Environment v${XTCVER} for Linux                  #"
     echo "#               by Rafal Kupiec <belliash@codingworkshop.eu.org>              #"
     echo "###############################################################################"
     echo
     echo
-    echo "Binutils Version: $(${FBEDIR}/bin/i686-w64-mingw32-ld -v | cut -d' ' -f5)"
-    echo "GCC Version: $(${FBEDIR}/bin/i686-w64-mingw32-gcc -v 2>&1| grep 'gcc version' | cut -d' ' -f3)"
-    echo "IDL Compiler Version: $(${FBEDIR}/bin/i686-w64-mingw32-widl -V | grep 'version' | cut -d' ' -f5)"
+    echo "Binutils Version: $(${XTCDIR}/bin/i686-w64-mingw32-ld -v | cut -d' ' -f5)"
+    echo "GCC Version: $(${XTCDIR}/bin/i686-w64-mingw32-gcc -v 2>&1| grep 'gcc version' | cut -d' ' -f3)"
+    echo "IDL Compiler Version: $(${XTCDIR}/bin/i686-w64-mingw32-widl -V | grep 'version' | cut -d' ' -f5)"
+    echo "Wine Message Compiler Version: $(${XTCDIR}/bin/wmc -V | grep 'version' | cut -d' ' -f5)"
+    echo "Wine Resource Compiler Version: $(${XTCDIR}/bin/wrc --version | grep 'version' | cut -d' ' -f5)"
+    echo
     charch ${TARGET}
     echo
     echo

@@ -1,11 +1,20 @@
 #!/bin/bash
-set -e
+# PROJECT:     XTchain
+# LICENSE:     See the COPYING.md in the top level directory
+# FILE:        build-linux.sh
+# DESCRIPTION: Toolchain building and assembly script
+# DEVELOPERS:  Rafal Kupiec <belliash@codingworkshop.eu.org>
+
 
 # Working Directories
 BINDIR="$(pwd)/binaries"
 PCHDIR="$(pwd)/patches"
 SRCDIR="$(pwd)/sources"
 WRKDIR="$(pwd)"
+
+# Architecture Settings
+ARCHS="i686 x86_64"
+GENERIC="generic-w64-mingw32"
 
 # Compiler Flags
 CFLAGS="-march=x86-64 -mtune=generic -O2 -s -pipe"
@@ -26,9 +35,16 @@ GCCDIR="${SRCDIR}/gcc"
 GCCTAG="releases/gcc-9.3.0"
 GCCVCS="git://gcc.gnu.org/git/gcc.git"
 
+# Make Settings
+MAKEDIR="${SRCDIR}/make"
+MAKETAG="4.3"
+MAKEVCS="git://git.savannah.gnu.org/make"
+
 # Mingw-w64 Settings
 MINGWDIR="${SRCDIR}/mingw-w64"
+MINGWLIB="msvcrt"
 MINGWTAG="v6.0.0"
+MINGWNTV="0x502"
 MINGWVCS="https://github.com/mirror/mingw-w64.git"
 
 # Ninja Settings
@@ -36,11 +52,13 @@ NINJADIR="${SRCDIR}/ninja"
 NINJATAG="v1.10.0"
 NINJAVCS="https://github.com/ninja-build/ninja.git"
 
-# Architecture Settings
-ARCHS="i686 x86_64"
-GENERIC="generic-w64-mingw32"
+# Wine Settings
+WINEDIR="${SRCDIR}/wine"
+WINETAG="wine-5.15"
+WINEVCS="git://source.winehq.org/git/wine.git"
 
 
+# This function applies a patches to the 3rd party project
 apply_patches()
 {
     local PACKAGE="${1}"
@@ -65,6 +83,7 @@ apply_patches()
     fi
 }
 
+# This function compiles and installs BINUTILS
 binutils_build()
 {
     for ARCH in ${ARCHS}; do
@@ -89,6 +108,7 @@ binutils_build()
     cd ${WRKDIR}
 }
 
+# This function downloads BINUTILS from VCS
 binutils_fetch()
 {
     if [ ! -d ${BINUTILSDIR} ]; then
@@ -101,6 +121,7 @@ binutils_fetch()
     fi
 }
 
+# This function compiles and installs CMAKE
 cmake_build()
 {
     echo ">>> Building CMAKE ..."
@@ -116,6 +137,7 @@ cmake_build()
     cd ${WRKDIR}
 }
 
+# This function downloads CMAKE from VCS
 cmake_fetch()
 {
     if [ ! -d ${CMAKEDIR} ]; then
@@ -128,6 +150,7 @@ cmake_fetch()
     fi
 }
 
+# This function compiles and install GCC (phase 1)
 gcc_build_phase1()
 {
     for ARCH in ${ARCHS}; do
@@ -159,6 +182,7 @@ gcc_build_phase1()
     cd ${WRKDIR}
 }
 
+# This function compiles and install GCC (phase 2)
 gcc_build_phase2()
 {
     for ARCH in ${ARCHS}; do
@@ -170,6 +194,7 @@ gcc_build_phase2()
     cd ${WRKDIR}
 }
 
+# This function downloads GCC from VCS
 gcc_fetch()
 {
     if [ ! -d ${GCCDIR} ]; then
@@ -183,6 +208,44 @@ gcc_fetch()
     fi
 }
 
+# This function compiles and install MAKE
+make_build()
+{
+    echo ">>> Building Make ..."
+    [ -z ${CLEAN} ] || rm -rf ${MAKEDIR}/build
+    cd ${MAKEDIR}
+    ./bootstrap
+    sed -i "s/-Werror//" maintMakefile
+    mkdir -p ${MAKEDIR}/build
+    cd ${MAKEDIR}/build
+    ../configure \
+        --prefix=${BINDIR} \
+        --disable-dependency-tracking \
+        --disable-silent-rules \
+        --program-prefix=g \
+        --without-guile
+    make -j${CORES}
+    make install
+    if [ ! -e ${BINDIR}/bin/make ]; then
+        ln -sf gmake ${BINDIR}/bin/make
+    fi
+    cd ${WRKDIR}
+}
+
+# This function downloads MAKE from VCS
+make_fetch()
+{
+    if [ ! -d ${MAKEDIR} ]; then
+        echo ">>> Downloading Make ..."
+        git clone ${MAKEVCS} ${MAKEDIR}
+        cd ${MAKEDIR}
+        git checkout tags/${MAKETAG}
+        apply_patches ${MAKEDIR##*/} ${MAKETAG}
+        cd ${WRKDIR}
+    fi
+}
+
+# This function compiles and installs MINGW CRT
 mingw_build_crt()
 {
     for ARCH in ${ARCHS}; do
@@ -204,7 +267,7 @@ mingw_build_crt()
             --host=${ARCH}-w64-mingw32 \
             --prefix=${BINDIR}/${ARCH}-w64-mingw32 \
             --with-sysroot=${BINDIR} \
-            --with-default-msvcrt=msvcrt \
+            --with-default-msvcrt=${MINGWLIB} \
             ${FLAGS}
         make -j${CORES}
         make install
@@ -213,6 +276,7 @@ mingw_build_crt()
     cd ${WRKDIR}
 }
 
+# This function compiles and installs MINGW headers
 mingw_build_headers()
 {
     echo ">>> Building Mingw-w64 (headers) ..."
@@ -222,8 +286,8 @@ mingw_build_headers()
     ../configure \
         --prefix=${BINDIR}/${GENERIC} \
         --enable-idl \
-        --with-default-msvcrt=msvcrt \
-        --with-default-win32-winnt=0x502
+        --with-default-msvcrt=${MINGWLIB} \
+        --with-default-win32-winnt=${MINGWNTV}
     make -j${CORES}
     make install
     mkdir -p ${BINDIR}/mingw
@@ -239,6 +303,7 @@ mingw_build_headers()
     cd ${WRKDIR}
 }
 
+# This function compiles and install MINGW libraries
 mingw_build_libs()
 {
     for LIB in libmangle winstorecompat; do
@@ -261,6 +326,7 @@ mingw_build_libs()
     cd ${WRKDIR}
 }
 
+# This function compiles and installs MINGW tools
 mingw_build_tools()
 {
     for TOOL in gendef genidl genlib genpeimg widl; do
@@ -282,6 +348,7 @@ mingw_build_tools()
     cd ${WRKDIR}
 }
 
+# This function downloads MINGW from VCS
 mingw_fetch()
 {
     if [ ! -d ${MINGWDIR} ]; then
@@ -294,6 +361,7 @@ mingw_fetch()
     fi
 }
 
+# This function compiles and installs NINJA
 ninja_build()
 {
     echo ">>> Building NINJA ..."
@@ -305,6 +373,7 @@ ninja_build()
     cd ${WRKDIR}
 }
 
+# This function downloads NINJA from VCS
 ninja_fetch()
 {
     if [ ! -d ${NINJADIR} ]; then
@@ -316,6 +385,63 @@ ninja_fetch()
         cd ${WRKDIR}
     fi
 }
+
+# This function compiles and install WINE tools
+wine_build()
+{
+    echo ">>> Building Wine ..."
+    mkdir -p ${WINEDIR}/build
+    cd ${WINEDIR}/build
+    ../configure \
+        -enable-win64
+    for TOOL in winedump wmc wrc; do
+        make -j${CORES} tools/${TOOL}
+        cp tools/${TOOL}/${TOOL} ${BINDIR}/bin/
+        for ARCH in ${ARCHS}; do
+            if [ ! -e ${BINDIR}/bin/${ARCH}-w64-mingw32-${TOOL} ]; then
+                ln -sf ${TOOL} ${BINDIR}/bin/${ARCH}-w64-mingw32-${TOOL}
+            fi
+        done
+    done
+    cd ${WRKDIR}
+}
+
+# This function downloads WINE from VCS
+wine_fetch()
+{
+    if [ ! -d ${WINEDIR} ]; then
+        echo ">>> Downloading WINE ..."
+        git clone ${WINEVCS} ${WINEDIR}
+        cd ${WINEDIR}
+        git checkout tags/${WINETAG}
+        apply_patches ${WINEDIR##*/} ${WINETAG##*-}
+        cd ${WRKDIR}
+    fi
+}
+
+# This function installs XTCHAIN scripts, wrappers and symlinks
+xtchain_build()
+{
+    echo ">>> Building XTchain ..."
+    mkdir -p ${BINDIR}/bin
+    mkdir -p ${BINDIR}/lib/xtchain
+    mkdir -p ${BINDIR}/${GENERIC}/bin
+    for ARCH in ${ARCHS}; do
+        for EXEC in xtcspecc; do
+            if [ ! -e ${BINDIR}/bin/${EXEC} ]; then
+                gcc ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}
+            fi
+            ln -sf ${EXEC} ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}
+        done
+    done
+    cp ${WRKDIR}/scripts/xtclib ${BINDIR}/lib/xtchain/
+    cp ${WRKDIR}/scripts/xtchain ${BINDIR}/
+    cd ${WRKDIR}
+}
+
+
+# Exit immediately on any failure
+set -e
 
 # Check if script launched as root
 if [ "$(whoami)" = "root" ]; then
@@ -335,6 +461,9 @@ mkdir -p ${SRCDIR}
 # Export compiler flags
 export CFLAGS
 export CXXFLAGS
+
+# XTchain
+xtchain_build
 
 # Download Mingw-W64
 mingw_fetch
@@ -366,6 +495,18 @@ mingw_build_libs
 # Build and install Mingw-W64 tools
 mingw_build_tools
 
+# Download Wine
+wine_fetch
+
+# Build and install Wine tools
+wine_build
+
+# Download Make
+make_fetch
+
+# Build and install Make
+make_build
+
 # Download CMake
 cmake_fetch
 
@@ -382,16 +523,12 @@ ninja_build
 echo ">>> Removing unneeded files to save disk space ..."
 rm -rf ${BINDIR}/{doc,include,mingw,share/{bash-completion,emacs,gcc*,info,man,vim}}
 
-# Copy all scripts
-echo ">>> Copying scripts ..."
-cp -apf ${WRKDIR}/scripts/* ${BINDIR}/
-
-# Save FBE version
+# Save XT Toolchain version
 cd ${WRKDIR}
-: ${FBEVER:=$(git describe --exact-match --tags 2>/dev/null)}
-: ${FBEVER:=DEV}
-echo "${FBEVER}" > ${BINDIR}/Version
+: ${XTCVER:=$(git describe --exact-match --tags 2>/dev/null)}
+: ${XTCVER:=DEV}
+echo "${XTCVER}" > ${BINDIR}/Version
 
 # Prepare archive
 echo ">>> Creating toolchain archive ..."
-tar -I 'zstd -19' -cpf fbe-${FBEVER}-linux.tar.zst -C ${BINDIR} .
+tar -I 'zstd -19' -cpf xtchain-${XTCVER}-linux.tar.zst -C ${BINDIR} .

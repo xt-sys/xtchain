@@ -23,7 +23,7 @@ index 5149ef582b..f09e4b7382 100644
 +      subsystem_name = "XT PSX application";
 +      break;
 +    case IMAGE_SUBSYSTEM_XT_DYNLIB:
-+      subsystem_name = "XT dynamic library"
++      subsystem_name = "XT dynamic library";
 +      break;
      /* Added default case for clarity - subsystem_name is NULL anyway.  */
      default:

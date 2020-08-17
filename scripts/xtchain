@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# PROJECT:     XTchain
+# LICENSE:     See the COPYING.md in the top level directory
+# FILE:        scripts/xtchain
+# DESCRIPTION: XTchain Entry Script
+# DEVELOPERS:  Rafal Kupiec <belliash@codingworkshop.eu.org>
+
 
 # Check if script launched as root
 if [ "$(whoami)" = "root" ]; then
@@ -6,18 +12,18 @@ if [ "$(whoami)" = "root" ]; then
     exit 1
 fi
 
-# Get the absolute path to the FBE
-export FBEDIR="$(realpath $(dirname ${0}))"
+# Get the absolute path to the XTchain
+export XTCDIR="$(realpath $(dirname ${0}))"
 
-# Read the FBE version
-export FBEVER="$(cat ${FBEDIR}/Version)"
+# Read the XTchain version
+export XTCVER="$(cat ${XTCDIR}/Version)"
 
 # Load the library
-source ${FBEDIR}/fbelib.sh
+source ${XTCDIR}/lib/xtchain/xtclib
 
 # Set the target architecture
 : ${TARGET:=${1}}
-: ${TARGET:=i386}
+: ${TARGET:=amd64}
 
 # Save the source directory
 export SRCDIR="${2:-${PWD}}"
@@ -29,7 +35,7 @@ export CXXFLAGS=
 export LDFLAGS=
 
 # Update PATH
-export PATH="${FBEDIR}/bin:${PATH}"
+export PATH="${XTCDIR}/bin:${PATH}"
 
 # Display banner
 version
@@ -40,5 +46,5 @@ export PFMAT2="\[\033[0;34;104m\]"
 export PFMAT3="\[\033[0;1;97;104m\]"
 export PFMAT4="\[\033[0;94;49m\]"
 export PFMAT5="\[\033[1;38;5;74m\]"
-export PROMPT="\n${PFMAT1} FerretOS BE ${PFMAT2}${PFMAT3} \w ${PFMAT4}${PFMAT5} "
+export PROMPT="\n${PFMAT1} XT Toolchain ${PFMAT2}${PFMAT3} \w ${PFMAT4}${PFMAT5} "
 bash --rcfile <(echo 'source ~/.bashrc && export PS1="${PROMPT}" && cd ${SRCDIR}')
