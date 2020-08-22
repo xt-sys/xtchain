@@ -32,7 +32,7 @@ CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # GCC Settings
 GCCDIR="${SRCDIR}/gcc"
-GCCTAG="releases/gcc-9.3.0"
+GCCTAG="releases/gcc-10.2.0"
 GCCVCS="git://gcc.gnu.org/git/gcc.git"
 
 # Make Settings
