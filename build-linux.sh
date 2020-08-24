@@ -162,7 +162,7 @@ gcc_build_phase1()
             --target=${ARCH}-w64-mingw32 \
             --prefix=${BINDIR} \
             --with-sysroot=${BINDIR} \
-            --with-pkgversion="FerretOS Build Environment" \
+            --with-pkgversion="XTchain" \
             --without-zstd \
             --disable-libstdcxx-verbose \
             --disable-multilib \
