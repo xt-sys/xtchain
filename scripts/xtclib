@@ -43,7 +43,7 @@ version()
     echo
     echo
     echo "LLVM Compiler Version: $(${XTCDIR}/bin/clang --version | grep 'clang version' | cut -d' ' -f3)"
-    echo "LLVM Windres Utility Version: $(${XTCDIR}/generic-w64-mingw32/bin/windres-wrapper -V | cut -d' ' -f7)"
+    echo "LLVM Windres Utility Version: $(${XTCDIR}/bin/i686-w64-mingw32-windres -V | cut -d' ' -f6)"
     echo "Mingw IDL Compiler Version: $(${XTCDIR}/bin/i686-w64-mingw32-widl -V | grep 'version' | cut -d' ' -f5)"
     echo "Wine Message Compiler Version: $(${XTCDIR}/bin/wmc -V | grep 'version' | cut -d' ' -f5)"
     echo "Wine Resource Compiler Version: $(${XTCDIR}/bin/wrc --version | grep 'version' | cut -d' ' -f5)"
