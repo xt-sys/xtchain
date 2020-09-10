@@ -49,7 +49,6 @@ enum _ARCH
 };
 
 typedef int (*PFNOUTLINE)(FILE *, EXPORT *);
-int gbMSComp = 0;
 int gbImportLib = 0;
 int gbNotPrivateNoWarn = 0;
 int gbTracing = 0;
@@ -531,20 +530,13 @@ PrintName(FILE *fileDest,
         pcAt = ScanToken(pcName, '@');
         if(pcAt && (pcAt < (pcName + nNameLength)))
         {
-            /* On GCC, we need to remove the leading stdcall underscore */
-            if(!gbMSComp && (pexp->nCallingConvention == CC_STDCALL))
-            {
-                pcName++;
-                nNameLength--;
-            }
-
             /* Print the already decorated function name */
             fprintf(fileDest, "%.*s", nNameLength, pcName);
         }
         else
         {
-            /* Print the prefix, but skip it for (GCC && stdcall) */
-            if(gbMSComp || (pexp->nCallingConvention != CC_STDCALL))
+            /* Print the prefix, but skip it for stdcall */
+            if(pexp->nCallingConvention != CC_STDCALL)
             {
                 fprintf(fileDest, "%c", pexp->nCallingConvention == CC_FASTCALL ? '@' : '_');
             }
@@ -560,10 +552,13 @@ PrintName(FILE *fileDest,
     }
 }
 
-void
-OutputLine_def_MS(FILE *fileDest,
-                  EXPORT *pexp)
+int
+OutputLine_def(FILE *fileDest,
+               EXPORT *pexp)
 {
+    DbgPrint("OutputLine_def: '%.*s'...\n", pexp->strName.len, pexp->strName.buf);
+    fprintf(fileDest, " ");
+
     PrintName(fileDest, pexp, &pexp->strName, 0);
 
     if(gbImportLib)
@@ -609,92 +604,6 @@ OutputLine_def_MS(FILE *fileDest,
     {
         /* Redirect it to the relay-tracing trampoline */
         fprintf(fileDest, "=$relaytrace$%.*s", pexp->strName.len, pexp->strName.buf);
-    }
-}
-
-void
-OutputLine_def_GCC(FILE *fileDest,
-                   EXPORT *pexp)
-{
-    int bTracing = 0;
-    /* Print the function name, with decoration for export libs */
-    PrintName(fileDest, pexp, &pexp->strName, gbImportLib);
-    DbgPrint("Generating def line for '%.*s'\n", pexp->strName.len, pexp->strName.buf);
-
-    /* Check if this is a forwarded export */
-    if(pexp->strTarget.buf)
-    {
-        int fIsExternal = !!ScanToken(pexp->strTarget.buf, '.');
-        DbgPrint("Got redirect '%.*s'\n", pexp->strTarget.len, pexp->strTarget.buf);
-
-        /* print the target name, don't decorate if it is external */
-        fprintf(fileDest, "=");
-        PrintName(fileDest, pexp, &pexp->strTarget, !fIsExternal);
-    }
-    else if(((pexp->uFlags & FL_STUB) || (pexp->nCallingConvention == CC_STUB)) &&
-             (pexp->strName.buf[0] == '?'))
-    {
-        /* C++ stubs are forwarded to C stubs */
-        fprintf(fileDest, "=stub_function%d", pexp->nNumber);
-    }
-    else if(gbTracing && ((pexp->uFlags & FL_NORELAY) == 0) &&
-             (pexp->nCallingConvention == CC_STDCALL) &&
-            (pexp->strName.buf[0] != '?'))
-    {
-        /* Redirect it to the relay-tracing trampoline */
-        char buf[256];
-        STRING strTarget;
-        fprintf(fileDest, "=");
-        sprintf(buf, "$relaytrace$%.*s", pexp->strName.len, pexp->strName.buf);
-        strTarget.buf = buf;
-        strTarget.len = pexp->strName.len + 12;
-        PrintName(fileDest, pexp, &strTarget, 1);
-        bTracing = 1;
-    }
-
-    /* Special handling for stdcall and fastcall */
-    if((giArch == ARCH_X86) &&
-        ((pexp->nCallingConvention == CC_STDCALL) ||
-         (pexp->nCallingConvention == CC_FASTCALL)))
-    {
-        /* Is this the import lib? */
-        if(gbImportLib)
-        {
-            /* Is the name in the spec file decorated? */
-            const char* pcDeco = ScanToken(pexp->strName.buf, '@');
-            if(pcDeco && 
-                (pexp->strName.len > 1) &&
-                (pcDeco < pexp->strName.buf + pexp->strName.len))
-            {
-                /* Write the name including the leading @  */
-                fprintf(fileDest, "==%.*s", pexp->strName.len, pexp->strName.buf);
-            }
-        }
-        else if((!pexp->strTarget.buf) && !(bTracing))
-        {
-            /* Write a forwarder to the actual decorated symbol */
-            fprintf(fileDest, "=");
-            PrintName(fileDest, pexp, &pexp->strName, 1);
-        }
-    }
-}
-
-int
-OutputLine_def(FILE *fileDest,
-               EXPORT *pexp)
-{
-    DbgPrint("OutputLine_def: '%.*s'...\n", pexp->strName.len, pexp->strName.buf);
-    fprintf(fileDest, " ");
-
-    if(gbMSComp)
-        OutputLine_def_MS(fileDest, pexp);
-    else
-        OutputLine_def_GCC(fileDest, pexp);
-
-    /* On GCC builds we force ordinals */
-    if((pexp->uFlags & FL_ORDINAL) || (!gbMSComp && !gbImportLib))
-    {
-        fprintf(fileDest, " @%d", pexp->nOrdinal);
     }
 
     if(pexp->uFlags & FL_NONAME)
@@ -1028,10 +937,6 @@ ParseFile(char* pcStart,
             else if(CompareToken(pc, "-ordinal"))
             {
                 exp.uFlags |= FL_ORDINAL;
-                /* GCC doesn't automatically import by ordinal if an ordinal
-                 * is found in the def file. Force it. */
-                if(gbImportLib && !gbMSComp)
-                    exp.uFlags |= FL_NONAME;
             }
             else if(CompareToken(pc, "-stub"))
             {
@@ -1226,41 +1131,6 @@ ParseFile(char* pcStart,
             Fatal(pszSourceFileName, nLine, pcLine, pc, 0, "Ordinal export without ordinal");
         }
 
-        /*
-         * Check for special handling of OLE exports, only when MSVC
-         * is not used, since otherwise this is handled by MS LINK.EXE.
-         */
-        if(!gbMSComp)
-        {
-            /* Check whether the current export is not PRIVATE, or has an ordinal */
-            int bIsNotPrivate = (!gbNotPrivateNoWarn && /*gbImportLib &&*/ !(exp.uFlags & FL_PRIVATE));
-            int bHasOrdinal = (exp.uFlags & FL_ORDINAL);
-
-            /* Check whether the current export is an OLE export, in case any of these tests pass */
-            if(bIsNotPrivate || bHasOrdinal)
-            {
-                for(i = 0; i < ARRAYSIZE(astrOlePrivateExports); ++i)
-                {
-                    if(strlen(astrOlePrivateExports[i]) == exp.strName.len &&
-                        strncmp(exp.strName.buf, astrOlePrivateExports[i], exp.strName.len) == 0)
-                    {
-                        /* The current export is an OLE export: display the corresponding warning */
-                        if(bIsNotPrivate)
-                        {
-                            fprintf(stderr, "WARNING: %s line %d: Exported symbol '%.*s' should be PRIVATE\n",
-                                    pszSourceFileName, nLine, exp.strName.len, exp.strName.buf);
-                        }
-                        if(bHasOrdinal)
-                        {
-                            fprintf(stderr, "WARNING: %s line %d: exported symbol '%.*s' should not be assigned an ordinal\n",
-                                    pszSourceFileName, nLine, exp.strName.len, exp.strName.buf);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
         pexports[*cExports] = exp;
         (*cExports)++;
         gbDebug = 0;
@@ -1329,7 +1199,6 @@ void usage(void)
            "  -n=<name>               name of the dll\n"
            "  -a=<arch>               set architecture to one of: aarch64, armv7, i686, x86_64\n"
            "  --implib                generate a def file for an import library\n"
-           "  --msvc                  MSVC compatibility\n"
            "  --no-private-warnings   suppress warnings about symbols that should be private\n"
            "  --with-tracing          generate wine-like \"+relay\" trace trampolines (needs -s)\n",
            XTCSPECC_VERSION,
@@ -1392,10 +1261,6 @@ int main(int argc,
         else if(strcasecmp(argv[i], "--implib") == 0)
         {
             gbImportLib = 1;
-        }
-        else if(strcasecmp(argv[i], "--msvc") == 0)
-        {
-            gbMSComp = 1;
         }
         else if(strcasecmp(argv[i], "--no-private-warnings") == 0)
         {
@@ -1514,15 +1379,6 @@ int main(int argc,
     {
         fprintf(stderr, "error: could not parse file!\n");
         return -1;
-    }
-
-    if(!gbMSComp)
-    {
-        if(ApplyOrdinals(pexports, cExports) < 0)
-        {
-            fprintf(stderr, "error: could not apply ordinals!\n");
-            return -1;
-        }
     }
 
     if(pszDefFileName)
