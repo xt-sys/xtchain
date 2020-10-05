@@ -38,6 +38,11 @@ MINGWTAG="v7.0.0"
 MINGWNTV="0x601"
 MINGWVCS="https://github.com/mirror/mingw-w64.git"
 
+# NASM Settings
+NASMDIR="${SRCDIR}/nasm"
+NASMTAG="nasm-2.15.05"
+NASMVCS="https://github.com/netwide-assembler/nasm.git"
+
 # Ninja Settings
 NINJADIR="${SRCDIR}/ninja"
 NINJATAG="v1.10.0"
@@ -494,6 +499,30 @@ mingw_fetch()
     fi
 }
 
+# This function compiles and installs NASM
+nasm_build()
+{
+    cd ${NASMDIR}
+    ./autogen.sh
+    ./configure
+    make -j${CORES}
+    install nasm ndisasm ${BINDIR}/bin/
+    cd ${WRKDIR}
+}
+
+# This function downloads NASM from VCS
+nasm_fetch()
+{
+    if [ ! -d ${NASMDIR} ]; then
+        echo ">>> Downloading NASM ..."
+        git clone ${NASMVCS} ${NASMDIR}
+        cd ${NASMDIR}
+        git checkout tags/${NASMTAG}
+        apply_patches ${NASMDIR##*/} ${NASMTAG##*-}
+        cd ${WRKDIR}
+    fi
+}
+
 # This function compiles and installs NINJA
 ninja_build()
 {
@@ -609,6 +638,12 @@ llvm_fetch
 
 # Build and install LLVM
 llvm_build
+
+# Download NASM
+nasm_fetch
+
+# Build and install NASM
+nasm_build
 
 # Download Mingw-W64
 mingw_fetch
