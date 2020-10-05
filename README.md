@@ -14,6 +14,7 @@ This software includes:
  * LLVM
  * Make
  * Mingw-w64
+ * NASM
  * Ninja
  * Wine
 
