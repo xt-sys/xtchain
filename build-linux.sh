@@ -34,7 +34,7 @@ MAKEVCS="git://git.savannah.gnu.org/make"
 # Mingw-w64 Settings
 MINGWDIR="${SRCDIR}/mingw-w64"
 MINGWLIB="ucrt"
-MINGWTAG="v7.0.0"
+MINGWTAG="v8.0.0"
 MINGWNTV="0x601"
 MINGWVCS="https://github.com/mirror/mingw-w64.git"
 
