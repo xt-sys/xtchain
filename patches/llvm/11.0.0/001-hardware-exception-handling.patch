@@ -473,6 +473,184 @@ index b34243edea3..cbc309a3d42 100644
    }
  
    // Handle errors.
+diff --git a/clang/test/CodeGen/windows-seh-EHa-CppCatchDotDotDot.cpp b/clang/test/CodeGen/windows-seh-EHa-CppCatchDotDotDot.cpp
+new file mode 100644
+index 00000000000..4f261ab59ee
+--- /dev/null
++++ b/clang/test/CodeGen/windows-seh-EHa-CppCatchDotDotDot.cpp
+@@ -0,0 +1,58 @@
++// RUN: %clang_cc1 -triple x86_64-windows -feh-asynch -fcxx-exceptions -fexceptions -fms-extensions -x c++ -Wno-implicit-function-declaration -S -emit-llvm %s -o - | FileCheck %s
++
++// CHECK: define dso_local void @"?crash@@YAXH@Z
++// CHECK: invoke void @llvm.seh.try.begin()
++// CHECK: invoke void @llvm.eha.scope.begin()
++// CHECK: invoke void @llvm.eha.scope.end()
++
++// CHECK: %[[dst:[0-9-]+]] = catchswitch within none [label %catch] unwind to caller
++// CHECK: %[[dst1:[0-9-]+]] = catchpad within %[[dst]] [i8* null, i32 0, i8* null]
++// CHECK: "funclet"(token %[[dst1]])
++
++// CHECK: invoke void @llvm.seh.try.begin()
++// CHECK: %[[src:[0-9-]+]] = load volatile i32, i32* %i
++// CHECK-NEXT: invoke void @"?crash@@YAXH@Z"(i32 %[[src]])
++// CHECK: invoke void @llvm.seh.try.end()
++
++// *****************************************************************************
++// Abstract:     Test CPP catch(...) under SEH -EHa option
++
++void printf(...);
++int volatile *NullPtr = 0;
++void foo() {
++  *NullPtr = 0;
++}
++int *pt1, *pt2, *pt3;
++int g;
++void crash(int i) {
++  g = i;
++  try {
++    struct A {
++      A() {
++        printf(" in A ctor \n");
++        if (g == 0)
++          *NullPtr = 0;
++      }
++      ~A() {
++        printf(" in A dtor \n");
++      }
++    } ObjA;
++    if (i == 1)
++      *NullPtr = 0;
++  } catch (...) {
++    printf(" in catch(...) funclet \n");
++    if (i == 1)
++      throw(i);
++  }
++}
++
++int main() {
++  for (int i = 0; i < 2; i++) {
++    __try {
++      crash(i);
++    } __except (1) {
++      printf(" Test CPP unwind: in except handler i = %d \n", i);
++    }
++  }
++  return 0;
++}
+diff --git a/clang/test/CodeGen/windows-seh-EHa-CppDtors01.cpp b/clang/test/CodeGen/windows-seh-EHa-CppDtors01.cpp
+new file mode 100644
+index 00000000000..d731bbb8ad2
+--- /dev/null
++++ b/clang/test/CodeGen/windows-seh-EHa-CppDtors01.cpp
+@@ -0,0 +1,60 @@
++// RUN: %clang_cc1 -triple x86_64-windows -feh-asynch -fcxx-exceptions -fexceptions -fms-extensions -x c++ -Wno-implicit-function-declaration -S -emit-llvm %s -o - | FileCheck %s
++
++// CHECK: invoke void @llvm.eha.scope.begin()
++// CHECK: invoke void @llvm.eha.scope.begin()
++// CHECK: invoke void @llvm.eha.scope.begin()
++// CHECK: invoke void @llvm.eha.scope.end()
++// CHECK: invoke void @llvm.eha.scope.end()
++// CHECK: invoke void @llvm.eha.scope.end()
++
++// CHECK: invoke void @llvm.seh.try.begin()
++// CHECK: %[[src:[0-9-]+]] = load volatile i32, i32* %i
++// CHECK-NEXT: invoke void @"?crash@@YAXH@Z"(i32 %[[src]])
++// CHECK: invoke void @llvm.seh.try.end()
++
++// ****************************************************************************
++// Abstract:     Test CPP unwind Dtoring under SEH -EHa option
++
++void printf(...);
++int volatile *NullPtr = 0;
++void crash(int i) {
++  struct A {
++    ~A() {
++      printf(" in A dtor \n");
++    }
++  } ObjA;
++  if (i == 0)
++    *NullPtr = 0;
++
++  struct B {
++    ~B() {
++      printf(" in B dtor \n");
++    }
++  } ObjB;
++  if (i == 1)
++    *NullPtr = 0;
++
++  struct C {
++    ~C() {
++      printf(" in C dtor \n");
++    }
++  } ObjC;
++  if (i == 2)
++    *NullPtr = 0;
++}
++
++#define TRY __try
++#define CATCH_ALL __except (1)
++
++int g;
++int main() {
++  for (int i = 0; i < 3; i++) {
++    TRY {
++      crash(i);
++    }
++    CATCH_ALL {
++      printf(" Test CPP unwind: in catch handler i = %d \n", i);
++    }
++  }
++  return 0;
++}
+diff --git a/clang/test/CodeGen/windows-seh-EHa-TryInFinally.cpp b/clang/test/CodeGen/windows-seh-EHa-TryInFinally.cpp
+new file mode 100644
+index 00000000000..3efd7d6505f
+--- /dev/null
++++ b/clang/test/CodeGen/windows-seh-EHa-TryInFinally.cpp
+@@ -0,0 +1,42 @@
++// RUN: %clang_cc1 -triple x86_64-windows -feh-asynch -fcxx-exceptions -fexceptions -fms-extensions -x c++ -Wno-implicit-function-declaration -S -emit-llvm %s -o - | FileCheck %s
++
++// CHECK: invoke void @llvm.seh.try.begin()
++// CHECK: invoke void @llvm.seh.try.begin()
++// CHECK: %[[src:[0-9-]+]] = load volatile i32, i32* %i
++// CHECK-NEXT: i32 %[[src]]
++// CHECK: invoke void @llvm.seh.try.end()
++// CHECK: invoke void @llvm.seh.try.end()
++
++// CHECK: define internal void @"?fin$0@0@main@@"(i8 %abnormal_termination
++// CHECK: invoke void @llvm.seh.try.begin()
++// CHECK: invoke void @llvm.seh.try.end()
++
++// *****************************************************************************
++// Abstract:     Test __Try in __finally under SEH -EHa option
++void printf(...);
++int volatile *NullPtr = 0;
++int main() {
++  for (int i = 0; i < 3; i++) {
++    printf(" --- Test _Try in _finally --- i = %d \n", i);
++    __try {
++      __try {
++        printf("  In outer _try i = %d \n", i);
++        if (i == 0)
++          *NullPtr = 0;
++      } __finally {
++        __try {
++          printf("  In outer _finally i = %d \n", i);
++          if (i == 1)
++            *NullPtr = 0;
++        } __finally {
++          printf("  In Inner _finally i = %d \n", i);
++          if (i == 2)
++            *NullPtr = 0;
++        }
++      }
++    } __except (1) {
++      printf(" --- In outer except handler i = %d \n", i);
++    }
++  }
++  return 0;
++}
 diff --git a/llvm/docs/LangRef.rst b/llvm/docs/LangRef.rst
 index 9b58b9dfb17..1738ccd94ee 100644
 --- a/llvm/docs/LangRef.rst
