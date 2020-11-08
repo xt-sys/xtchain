@@ -1,0 +1,601 @@
+diff --git a/clang/include/clang/AST/Stmt.h b/clang/include/clang/AST/Stmt.h
+index d3fad58fcf5..dccbbe2fade 100644
+--- a/clang/include/clang/AST/Stmt.h
++++ b/clang/include/clang/AST/Stmt.h
+@@ -1764,6 +1764,7 @@ public:
+ class LabelStmt : public ValueStmt {
+   LabelDecl *TheDecl;
+   Stmt *SubStmt;
++  bool SideEntry = false;
+ 
+ public:
+   /// Build a label statement.
+@@ -1799,6 +1800,9 @@ public:
+   static bool classof(const Stmt *T) {
+     return T->getStmtClass() == LabelStmtClass;
+   }
++
++  bool isSideEntry() const { return SideEntry; }
++  void setSideEntry() { SideEntry = true; }
+ };
+ 
+ /// Represents an attribute applied to a statement.
+diff --git a/clang/include/clang/Basic/LangOptions.def b/clang/include/clang/Basic/LangOptions.def
+index 70f68d664bb..1e87b455db8 100644
+--- a/clang/include/clang/Basic/LangOptions.def
++++ b/clang/include/clang/Basic/LangOptions.def
+@@ -128,6 +128,7 @@ LANGOPT(ZVector           , 1, 0, "System z vector extensions")
+ LANGOPT(Exceptions        , 1, 0, "exception handling")
+ LANGOPT(ObjCExceptions    , 1, 0, "Objective-C exceptions")
+ LANGOPT(CXXExceptions     , 1, 0, "C++ exceptions")
++LANGOPT(EHAsynch          , 1, 0, "C/C++ EH Asynch exceptions")
+ LANGOPT(DWARFExceptions   , 1, 0, "dwarf exception handling")
+ LANGOPT(SjLjExceptions    , 1, 0, "setjmp-longjump exception handling")
+ LANGOPT(SEHExceptions     , 1, 0, "SEH .xdata exception handling")
+diff --git a/clang/include/clang/Driver/Options.td b/clang/include/clang/Driver/Options.td
+index 966cb907b7e..dc7b38c254f 100644
+--- a/clang/include/clang/Driver/Options.td
++++ b/clang/include/clang/Driver/Options.td
+@@ -889,6 +889,8 @@ def fno_crash_diagnostics : Flag<["-"], "fno-crash-diagnostics">, Group<f_clang_
+ def fcrash_diagnostics_dir : Joined<["-"], "fcrash-diagnostics-dir=">, Group<f_clang_Group>, Flags<[NoArgumentUnused, CoreOption]>;
+ def fcreate_profile : Flag<["-"], "fcreate-profile">, Group<f_Group>;
+ defm cxx_exceptions: OptInFFlag<"cxx-exceptions", "Enable C++ exceptions">;
++def feh_asynch: Flag<["-"], "feh-asynch">, Group<f_Group>,
++  HelpText<"Enable EH Asynchronous exceptions">, Flags<[CC1Option]>;
+ def fcxx_modules : Flag <["-"], "fcxx-modules">, Group<f_Group>,
+   Flags<[DriverOption]>;
+ def fdebug_pass_arguments : Flag<["-"], "fdebug-pass-arguments">, Group<f_Group>;
+@@ -1505,6 +1507,7 @@ def fno_common : Flag<["-"], "fno-common">, Group<f_Group>, Flags<[CC1Option]>,
+ def fno_constant_cfstrings : Flag<["-"], "fno-constant-cfstrings">, Group<f_Group>,
+   Flags<[CC1Option]>,
+   HelpText<"Disable creation of CodeFoundation-type constant strings">;
++def fno_eh_asynch: Flag<["-"], "fno-eh-asynch">, Group<f_Group>;
+ def fno_cxx_modules : Flag <["-"], "fno-cxx-modules">, Group<f_Group>,
+   Flags<[DriverOption]>;
+ def fno_diagnostics_fixit_info : Flag<["-"], "fno-diagnostics-fixit-info">, Group<f_Group>,
+diff --git a/clang/lib/CodeGen/CGCleanup.cpp b/clang/lib/CodeGen/CGCleanup.cpp
+index ad543ef86c1..7c1902f080f 100644
+--- a/clang/lib/CodeGen/CGCleanup.cpp
++++ b/clang/lib/CodeGen/CGCleanup.cpp
+@@ -763,10 +763,22 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
+     destroyOptimisticNormalEntry(*this, Scope);
+     EHStack.popCleanup();
+   } else {
++    // Under -EHa, invoke eha_scope_end() to mark scope end before dtor
++    bool IsEHa = getLangOpts().EHAsynch && !Scope.isLifetimeMarker();
++    const EHPersonality &Personality = EHPersonality::get(*this);
++
+     // If we have a fallthrough and no other need for the cleanup,
+     // emit it directly.
+-    if (HasFallthrough && !HasPrebranchedFallthrough &&
+-        !HasFixups && !HasExistingBranches) {
++    if (HasFallthrough && !HasPrebranchedFallthrough && !HasFixups &&
++        !HasExistingBranches) {
++
++      // mark EHa scope end for fall-through flow
++      if (IsEHa && getInvokeDest())
++        if (Personality.isMSVCXXPersonality())
++          EmitSehCppScopeEnd();
++        else {
++          EmitSehTryScopeEnd();
++        }
+ 
+       destroyOptimisticNormalEntry(*this, Scope);
+       EHStack.popCleanup();
+@@ -801,6 +813,14 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
+       // should already be branched to it.
+       EmitBlock(NormalEntry);
+ 
++      // intercept normal cleanup to mark EHa scope end
++      if (IsEHa)
++        if (Personality.isMSVCXXPersonality())
++          EmitSehCppScopeEnd();
++        else {
++          EmitSehTryScopeEnd();
++        }
++
+       // III.  Figure out where we're going and build the cleanup
+       // epilogue.
+ 
+@@ -1276,3 +1296,61 @@ void CodeGenFunction::EmitCXXTemporary(const CXXTemporary *Temporary,
+   pushDestroy(NormalAndEHCleanup, Ptr, TempType, destroyCXXObject,
+               /*useEHCleanup*/ true);
+ }
++
++// Need to set "funclet" in OperandBundle properly for noThrow
++//       intrinsic (see CGCall.cpp)
++static void EmitSehEHaScope(CodeGenFunction &CGF,
++                            llvm::FunctionCallee &SehCppScope) {
++  llvm::BasicBlock *InvokeDest = CGF.getInvokeDest();
++  llvm::BasicBlock *BB = CGF.Builder.GetInsertBlock();
++  assert(BB && InvokeDest);
++  llvm::BasicBlock *Cont = CGF.createBasicBlock("invoke.cont");
++  SmallVector<llvm::OperandBundleDef, 1> BundleList =
++      CGF.getBundlesForFunclet(SehCppScope.getCallee());
++  if (CGF.CurrentFuncletPad)
++    BundleList.emplace_back("funclet", CGF.CurrentFuncletPad);
++  CGF.Builder.CreateInvoke(SehCppScope, Cont, InvokeDest, None, BundleList);
++  CGF.EmitBlock(Cont);
++}
++
++// Invoke a llvm.eha.scope.begin at the beginning of a CPP scope for -EHa
++void CodeGenFunction::EmitSehCppScopeBegin() {
++  assert(getLangOpts().EHAsynch);
++  llvm::FunctionType *FTy =
++      llvm::FunctionType::get(CGM.VoidTy, /*isVarArg=*/false);
++  llvm::FunctionCallee SehCppScope =
++      CGM.CreateRuntimeFunction(FTy, "llvm.eha.scope.begin");
++  EmitSehEHaScope(*this, SehCppScope);
++}
++
++// Invoke a llvm.eha.scope.end at the end of a CPP scope for -EHa
++//   llvm.eha.scope.end is emitted before popCleanup, so it's "invoked"
++void CodeGenFunction::EmitSehCppScopeEnd() {
++  assert(getLangOpts().EHAsynch);
++  llvm::FunctionType *FTy =
++      llvm::FunctionType::get(CGM.VoidTy, /*isVarArg=*/false);
++  llvm::FunctionCallee SehCppScope =
++      CGM.CreateRuntimeFunction(FTy, "llvm.eha.scope.end");
++  EmitSehEHaScope(*this, SehCppScope);
++}
++
++// Invoke a llvm.eha.scope.begin at the beginning of a CPP scope for -EHa
++void CodeGenFunction::EmitSehTryScopeBegin() {
++  assert(getLangOpts().EHAsynch);
++  llvm::FunctionType *FTy =
++      llvm::FunctionType::get(CGM.VoidTy, /*isVarArg=*/false);
++  llvm::FunctionCallee SehCppScope =
++      CGM.CreateRuntimeFunction(FTy, "llvm.seh.try.begin");
++  EmitSehEHaScope(*this, SehCppScope);
++}
++
++// Invoke a llvm.eha.scope.end at the end of a CPP scope for -EHa
++//   llvm.eha.scope.end is emitted before popCleanup, so it's "invoked"
++void CodeGenFunction::EmitSehTryScopeEnd() {
++  assert(getLangOpts().EHAsynch);
++  llvm::FunctionType *FTy =
++      llvm::FunctionType::get(CGM.VoidTy, /*isVarArg=*/false);
++  llvm::FunctionCallee SehCppScope =
++      CGM.CreateRuntimeFunction(FTy, "llvm.seh.try.end");
++  EmitSehEHaScope(*this, SehCppScope);
++}
+diff --git a/clang/lib/CodeGen/CGDecl.cpp b/clang/lib/CodeGen/CGDecl.cpp
+index 1729c7ed3c3..c9107b1296f 100644
+--- a/clang/lib/CodeGen/CGDecl.cpp
++++ b/clang/lib/CodeGen/CGDecl.cpp
+@@ -2006,9 +2006,16 @@ void CodeGenFunction::EmitAutoVarCleanups(const AutoVarEmission &emission) {
+   const VarDecl &D = *emission.Variable;
+ 
+   // Check the type for a cleanup.
+-  if (QualType::DestructionKind dtorKind = D.needsDestruction(getContext()))
++  if (QualType::DestructionKind dtorKind = D.needsDestruction(getContext())) {
+     emitAutoVarTypeCleanup(emission, dtorKind);
+ 
++    // Under -EHa, Invoke llvm.eha.scope.begin() right after
++    //   Ctor is emitted and EHStack.pushCleanup
++    bool IsEHa = getLangOpts().EHAsynch;
++    if (IsEHa && dtorKind == QualType::DK_cxx_destructor)
++      EmitSehCppScopeBegin();
++  }
++
+   // In GC mode, honor objc_precise_lifetime.
+   if (getLangOpts().getGC() != LangOptions::NonGC &&
+       D.hasAttr<ObjCPreciseLifetimeAttr>()) {
+diff --git a/clang/lib/CodeGen/CGException.cpp b/clang/lib/CodeGen/CGException.cpp
+index bdf70252b5a..a4e4d7d8120 100644
+--- a/clang/lib/CodeGen/CGException.cpp
++++ b/clang/lib/CodeGen/CGException.cpp
+@@ -39,6 +39,18 @@ static llvm::FunctionCallee getFreeExceptionFn(CodeGenModule &CGM) {
+   return CGM.CreateRuntimeFunction(FTy, "__cxa_free_exception");
+ }
+ 
++static llvm::FunctionCallee getSehTryBeginFn(CodeGenModule &CGM) {
++  llvm::FunctionType *FTy =
++      llvm::FunctionType::get(CGM.VoidTy, /*isVarArg=*/false);
++  return CGM.CreateRuntimeFunction(FTy, "llvm.seh.try.begin");
++}
++
++static llvm::FunctionCallee getSehTryEndFn(CodeGenModule &CGM) {
++  llvm::FunctionType *FTy =
++      llvm::FunctionType::get(CGM.VoidTy, /*isVarArg=*/false);
++  return CGM.CreateRuntimeFunction(FTy, "llvm.seh.try.end");
++}
++
+ static llvm::FunctionCallee getUnexpectedFn(CodeGenModule &CGM) {
+   // void __cxa_call_unexpected(void *thrown_exception);
+ 
+@@ -451,7 +463,7 @@ void CodeGenFunction::EmitStartEHSpec(const Decl *D) {
+   if (!FD) {
+     // Check if CapturedDecl is nothrow and create terminate scope for it.
+     if (const CapturedDecl* CD = dyn_cast_or_null<CapturedDecl>(D)) {
+-      if (CD->isNothrow())
++      if (CD->isNothrow() && !getLangOpts().EHAsynch /* !IsEHa */)
+         EHStack.pushTerminate();
+     }
+     return;
+@@ -463,7 +475,8 @@ void CodeGenFunction::EmitStartEHSpec(const Decl *D) {
+   ExceptionSpecificationType EST = Proto->getExceptionSpecType();
+   if (isNoexceptExceptionSpec(EST) && Proto->canThrow() == CT_Cannot) {
+     // noexcept functions are simple terminate scopes.
+-    EHStack.pushTerminate();
++    if (!getLangOpts().EHAsynch) // -EHa: HW exception still can occur
++      EHStack.pushTerminate();
+   } else if (EST == EST_Dynamic || EST == EST_DynamicNone) {
+     // TODO: Revisit exception specifications for the MS ABI.  There is a way to
+     // encode these in an object file but MSVC doesn't do anything with it.
+@@ -540,7 +553,7 @@ void CodeGenFunction::EmitEndEHSpec(const Decl *D) {
+   if (!FD) {
+     // Check if CapturedDecl is nothrow and pop terminate scope for it.
+     if (const CapturedDecl* CD = dyn_cast_or_null<CapturedDecl>(D)) {
+-      if (CD->isNothrow())
++      if (CD->isNothrow() && !EHStack.empty())
+         EHStack.popTerminate();
+     }
+     return;
+@@ -550,7 +563,8 @@ void CodeGenFunction::EmitEndEHSpec(const Decl *D) {
+     return;
+ 
+   ExceptionSpecificationType EST = Proto->getExceptionSpecType();
+-  if (isNoexceptExceptionSpec(EST) && Proto->canThrow() == CT_Cannot) {
++  if (isNoexceptExceptionSpec(EST) && Proto->canThrow() == CT_Cannot &&
++      !EHStack.empty() /* possible empty when -EHa */) {
+     EHStack.popTerminate();
+   } else if (EST == EST_Dynamic || EST == EST_DynamicNone) {
+     // TODO: Revisit exception specifications for the MS ABI.  There is a way to
+@@ -606,6 +620,9 @@ void CodeGenFunction::EnterCXXTryStmt(const CXXTryStmt &S, bool IsFnTryBlock) {
+     } else {
+       // No exception decl indicates '...', a catch-all.
+       CatchScope->setHandler(I, CGM.getCXXABI().getCatchAllTypeInfo(), Handler);
++      // Mark scope with SehTryBegin
++      if (getLangOpts().EHAsynch)
++        EmitRuntimeCallOrInvoke(getSehTryBeginFn(CGM));
+     }
+   }
+ }
+@@ -720,7 +737,7 @@ llvm::BasicBlock *CodeGenFunction::getInvokeDestImpl() {
+   // If exceptions are disabled/ignored and SEH is not in use, then there is no
+   // invoke destination. SEH "works" even if exceptions are off. In practice,
+   // this means that C++ destructors and other EH cleanups don't run, which is
+-  // consistent with MSVC's behavior.
++  // consistent with MSVC's behavior, except in the presence of -EHa
+   const LangOptions &LO = CGM.getLangOpts();
+   if (!LO.Exceptions || LO.IgnoreExceptions) {
+     if (!LO.Borland && !LO.MicrosoftExt)
+@@ -1610,7 +1627,23 @@ void CodeGenFunction::EmitSEHTryStmt(const SEHTryStmt &S) {
+     JumpDest TryExit = getJumpDestInCurrentScope("__try.__leave");
+ 
+     SEHTryEpilogueStack.push_back(&TryExit);
++
++    llvm::BasicBlock *TryBB = nullptr;
++    // IsEHa: emit an invoke to _seh_try_begin() runtime for -EHa
++    if (getLangOpts().EHAsynch) {
++      EmitRuntimeCallOrInvoke(getSehTryBeginFn(CGM));
++      if (SEHTryEpilogueStack.size() == 1) // outermost only
++        TryBB = Builder.GetInsertBlock();
++    }
++
+     EmitStmt(S.getTryBlock());
++
++    // Volatilize all blocks in Try, till current insert point
++    if (TryBB) {
++      llvm::SmallPtrSet<llvm::BasicBlock *, 10> Visited;
++      VolatilizeTryBlocks(TryBB, Visited);
++    }
++
+     SEHTryEpilogueStack.pop_back();
+ 
+     if (!TryExit.getBlock()->use_empty())
+@@ -1621,6 +1654,38 @@ void CodeGenFunction::EmitSEHTryStmt(const SEHTryStmt &S) {
+   ExitSEHTryStmt(S);
+ }
+ 
++//  Recursively walk through blocks in a _try
++//      and make all memory instructions volatile
++void CodeGenFunction::VolatilizeTryBlocks(
++    llvm::BasicBlock *BB, llvm::SmallPtrSet<llvm::BasicBlock *, 10> &V) {
++  if (BB == SEHTryEpilogueStack.back()->getBlock() /* end of Try */ ||
++      !V.insert(BB).second /* already visited */ ||
++      !BB->getParent() /* not emitted */ || BB->empty())
++    return;
++
++  if (!BB->isEHPad()) {
++    for (llvm::BasicBlock::iterator J = BB->begin(), JE = BB->end(); J != JE;
++         ++J) {
++      if (isa<llvm::LoadInst>(J)) {
++        auto LI = cast<llvm::LoadInst>(J);
++        LI->setVolatile(true);
++      } else if (isa<llvm::StoreInst>(J)) {
++        auto SI = cast<llvm::StoreInst>(J);
++        SI->setVolatile(true);
++      } else if (isa<llvm::MemIntrinsic>(J)) {
++        auto *MCI = cast<llvm::MemIntrinsic>(J);
++        MCI->setVolatile(llvm::ConstantInt::get(Builder.getInt1Ty(), 1));
++      }
++    }
++  }
++  const llvm::Instruction *TI = BB->getTerminator();
++  if (TI) {
++    unsigned N = TI->getNumSuccessors();
++    for (unsigned I = 0; I < N; I++)
++      VolatilizeTryBlocks(TI->getSuccessor(I), V);
++  }
++}
++
+ namespace {
+ struct PerformSEHFinally final : EHScopeStack::Cleanup {
+   llvm::Function *OutlinedFinally;
+@@ -2101,6 +2166,12 @@ void CodeGenFunction::ExitSEHTryStmt(const SEHTryStmt &S) {
+     return;
+   }
+ 
++  // IsEHa: emit an invoke _seh_try_end() to mark end of FT flow
++  if (getLangOpts().EHAsynch && Builder.GetInsertBlock()) {
++    llvm::FunctionCallee SehTryEnd = getSehTryEndFn(CGM);
++    EmitRuntimeCallOrInvoke(SehTryEnd);
++  }
++
+   // Otherwise, we must have an __except block.
+   const SEHExceptStmt *Except = S.getExceptHandler();
+   assert(Except && "__try must have __finally xor __except");
+diff --git a/clang/lib/CodeGen/CGStmt.cpp b/clang/lib/CodeGen/CGStmt.cpp
+index 672909849bb..32dca08b8cf 100644
+--- a/clang/lib/CodeGen/CGStmt.cpp
++++ b/clang/lib/CodeGen/CGStmt.cpp
+@@ -606,6 +606,11 @@ void CodeGenFunction::LexicalScope::rescopeLabels() {
+ 
+ void CodeGenFunction::EmitLabelStmt(const LabelStmt &S) {
+   EmitLabel(S.getDecl());
++
++  // IsEHa - emit eha.scope.begin if it's a side entry of a scope
++  if (getLangOpts().EHAsynch && S.isSideEntry())
++    EmitSehCppScopeBegin();
++
+   EmitStmt(S.getSubStmt());
+ }
+ 
+diff --git a/clang/lib/CodeGen/CodeGenFunction.h b/clang/lib/CodeGen/CodeGenFunction.h
+index d794f4f0fa8..1b5892c7459 100644
+--- a/clang/lib/CodeGen/CodeGenFunction.h
++++ b/clang/lib/CodeGen/CodeGenFunction.h
+@@ -2784,6 +2784,11 @@ public:
+   void EmitCXXTemporary(const CXXTemporary *Temporary, QualType TempType,
+                         Address Ptr);
+ 
++  void EmitSehCppScopeBegin();
++  void EmitSehCppScopeEnd();
++  void EmitSehTryScopeBegin();
++  void EmitSehTryScopeEnd();
++
+   llvm::Value *EmitLifetimeStart(uint64_t Size, llvm::Value *Addr);
+   void EmitLifetimeEnd(llvm::Value *Size, llvm::Value *Addr);
+ 
+@@ -3134,6 +3139,8 @@ public:
+   void EmitSEHLeaveStmt(const SEHLeaveStmt &S);
+   void EnterSEHTryStmt(const SEHTryStmt &S);
+   void ExitSEHTryStmt(const SEHTryStmt &S);
++  void VolatilizeTryBlocks(llvm::BasicBlock *BB,
++                           llvm::SmallPtrSet<llvm::BasicBlock *, 10> &V);
+ 
+   void pushSEHCleanup(CleanupKind kind,
+                       llvm::Function *FinallyFunc);
+diff --git a/clang/lib/CodeGen/CodeGenModule.cpp b/clang/lib/CodeGen/CodeGenModule.cpp
+index 4ae8ce7e5cc..5512c8fe88a 100644
+--- a/clang/lib/CodeGen/CodeGenModule.cpp
++++ b/clang/lib/CodeGen/CodeGenModule.cpp
+@@ -593,6 +593,9 @@ void CodeGenModule::Release() {
+                                   llvm::DenormalMode::IEEE);
+   }
+ 
++  if (LangOpts.EHAsynch)
++    getModule().addModuleFlag(llvm::Module::Warning, "eh-asynch", 1);
++
+   // Emit OpenCL specific module metadata: OpenCL/SPIR version.
+   if (LangOpts.OpenCL) {
+     EmitOpenCLMetadata();
+diff --git a/clang/lib/CodeGen/MicrosoftCXXABI.cpp b/clang/lib/CodeGen/MicrosoftCXXABI.cpp
+index 45c6cb6b2e0..a080c93356a 100644
+--- a/clang/lib/CodeGen/MicrosoftCXXABI.cpp
++++ b/clang/lib/CodeGen/MicrosoftCXXABI.cpp
+@@ -131,7 +131,12 @@ public:
+ 
+   /// MSVC needs an extra flag to indicate a catchall.
+   CatchTypeInfo getCatchAllTypeInfo() override {
+-    return CatchTypeInfo{nullptr, 0x40};
++    // For -EHa catch(...) must handle HW exception
++    // Adjective = HT_IsStdDotDot (0x40), only catch C++ exceptions
++    if (getContext().getLangOpts().EHAsynch)
++      return CatchTypeInfo{nullptr, 0};
++    else
++      return CatchTypeInfo{nullptr, 0x40};
+   }
+ 
+   bool shouldTypeidBeNullChecked(bool IsDeref, QualType SrcRecordTy) override;
+diff --git a/clang/lib/Driver/ToolChains/Clang.cpp b/clang/lib/Driver/ToolChains/Clang.cpp
+index af4bcf951e6..71112783ac0 100644
+--- a/clang/lib/Driver/ToolChains/Clang.cpp
++++ b/clang/lib/Driver/ToolChains/Clang.cpp
+@@ -415,6 +415,7 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
+     Args.ClaimAllArgs(options::OPT_fobjc_exceptions);
+     Args.ClaimAllArgs(options::OPT_fno_objc_exceptions);
+     Args.ClaimAllArgs(options::OPT_fcxx_exceptions);
++    Args.ClaimAllArgs(options::OPT_feh_asynch);
+     Args.ClaimAllArgs(options::OPT_fno_cxx_exceptions);
+     return;
+   }
+@@ -423,6 +424,13 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
+   bool EH = Args.hasFlag(options::OPT_fexceptions, options::OPT_fno_exceptions,
+                          false);
+ 
++  bool EHa =
++      Args.hasFlag(options::OPT_feh_asynch, options::OPT_fno_eh_asynch, false);
++  if (EHa) {
++    CmdArgs.push_back("-feh-asynch");
++    EH = true;
++  }
++
+   // Obj-C exceptions are enabled by default, regardless of -fexceptions. This
+   // is not necessarily sensible, but follows GCC.
+   if (types::isObjC(InputType) &&
+@@ -6581,7 +6589,10 @@ void Clang::AddClangCLArgs(const ArgList &Args, types::ID InputType,
+     if (types::isCXX(InputType))
+       CmdArgs.push_back("-fcxx-exceptions");
+     CmdArgs.push_back("-fexceptions");
++    if (EH.Asynch)
++      CmdArgs.push_back("-feh-asynch");
+   }
++
+   if (types::isCXX(InputType) && EH.Synch && EH.NoUnwindC)
+     CmdArgs.push_back("-fexternc-nounwind");
+ 
+diff --git a/clang/lib/Frontend/CompilerInvocation.cpp b/clang/lib/Frontend/CompilerInvocation.cpp
+index 73114c6d76c..b58af0b68e7 100644
+--- a/clang/lib/Frontend/CompilerInvocation.cpp
++++ b/clang/lib/Frontend/CompilerInvocation.cpp
+@@ -2819,6 +2819,7 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
+   Opts.IgnoreExceptions = Args.hasArg(OPT_fignore_exceptions);
+   Opts.ObjCExceptions = Args.hasArg(OPT_fobjc_exceptions);
+   Opts.CXXExceptions = Args.hasArg(OPT_fcxx_exceptions);
++  Opts.EHAsynch = Args.hasArg(OPT_feh_asynch);
+ 
+   // -ffixed-point
+   Opts.FixedPoint =
+diff --git a/clang/lib/Sema/JumpDiagnostics.cpp b/clang/lib/Sema/JumpDiagnostics.cpp
+index b34243edea3..cbc309a3d42 100644
+--- a/clang/lib/Sema/JumpDiagnostics.cpp
++++ b/clang/lib/Sema/JumpDiagnostics.cpp
+@@ -930,6 +930,9 @@ void JumpScopeChecker::CheckJump(Stmt *From, Stmt *To, SourceLocation DiagLoc,
+   if (!ToScopesWarning.empty()) {
+     S.Diag(DiagLoc, JumpDiagWarning);
+     NoteJumpIntoScopes(ToScopesWarning);
++    assert(isa<LabelStmt>(To));
++    LabelStmt *Label = cast<LabelStmt>(To);
++    Label->setSideEntry();
+   }
+ 
+   // Handle errors.
+diff --git a/llvm/docs/LangRef.rst b/llvm/docs/LangRef.rst
+index 9b58b9dfb17..1738ccd94ee 100644
+--- a/llvm/docs/LangRef.rst
++++ b/llvm/docs/LangRef.rst
+@@ -11642,6 +11642,59 @@ The '``llvm.localescape``' intrinsic blocks inlining, as inlining changes where
+ the escaped allocas are allocated, which would break attempts to use
+ '``llvm.localrecover``'.
+ 
++'``llvm.seh.try.begin``' and '``llvm.seh.try.end``' Intrinsics
++^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++
++Syntax:
++"""""""
++
++::
++
++      declare void @llvm.seh.try.begin()
++      declare void @llvm.seh.try.end()
++
++Overview:
++"""""""""
++
++The '``llvm.seh.try.begin``' and '``llvm.seh.try.end``' intrinsics mark
++the boundary of a _try region for Windows SEH Asynchrous Exception Handling.
++
++Semantics:
++""""""""""
++
++When a C-function is compiled with Windows SEH Asynchrous Exception option,
++-feh_asynch (aka MSVC -EHa), these two intrinsics are injected to mark _try
++boundary and to prevent from potential exceptions being moved across boundary.
++
++'``llvm.eha.scope.begin``' and '``llvm.eha.scope.end``' Intrinsics
++^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++
++Syntax:
++"""""""
++
++::
++
++      declare void @llvm.eha.scope.begin()
++      declare void @llvm.eha.scope.end()
++
++Overview:
++"""""""""
++
++The '``llvm.eha.scope.begin``' and '``llvm.eha.scope.end``' intrinsics mark
++the boundary of a CPP object lifetime for Windows SEH Asynchrous Exception
++Handling (MSVC option -EHa).
++
++Semantics:
++""""""""""
++
++'``llvm.eha.scope.begin``' is added immediately after an object constructor is
++called, i.e., EHStack is not empty. So it will be an invoke, not a call.
++With that it's also guaranteed that an associated EH-cleanup-pad is
++created in IR regardless whether there exists a call in this object lifetime.
++'``llvm.eha.scope.end``' is added before the object destructor.
++These intrinsics make Block-level State computation possible in downstream
++LLVM code gen pass, even in the presence of ctor/dtor inlining.
++
+ .. _int_read_register:
+ .. _int_read_volatile_register:
+ .. _int_write_register:
+diff --git a/llvm/include/llvm/IR/Intrinsics.td b/llvm/include/llvm/IR/Intrinsics.td
+index 4918ea876df..7de760291d9 100644
+--- a/llvm/include/llvm/IR/Intrinsics.td
++++ b/llvm/include/llvm/IR/Intrinsics.td
+@@ -481,6 +481,16 @@ def int_eh_recoverfp : Intrinsic<[llvm_ptr_ty],
+                                  [llvm_ptr_ty, llvm_ptr_ty],
+                                  [IntrNoMem]>;
+ 
++// To mark the beginning/end of a try-scope for Windows SEH -EHa
++//  calls/invokes to these intrinsics are placed to model control flows
++//    caused by HW exceptions under option -EHa.
++//  calls/invokes to these intrinsics will be discarded during a codegen pass
++//   after EH tables are generated
++def int_seh_try_begin : Intrinsic<[], [], [IntrReadMem, IntrWriteMem, IntrWillReturn]>;
++def int_seh_try_end : Intrinsic<[], [], [IntrReadMem, IntrWriteMem, IntrWillReturn]>;
++def int_eha_scope_begin : Intrinsic<[], [], [IntrNoMem]>;
++def int_eha_scope_end : Intrinsic<[], [], [IntrNoMem]>;
++
+ // Note: we treat stacksave/stackrestore as writemem because we don't otherwise
+ // model their dependencies on allocas.
+ def int_stacksave     : Intrinsic<[llvm_ptr_ty]>,
+diff --git a/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp b/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp
+index d2930391f87..7e58de39962 100644
+--- a/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp
++++ b/llvm/lib/CodeGen/SelectionDAG/SelectionDAGBuilder.cpp
+@@ -2801,6 +2801,10 @@ void SelectionDAGBuilder::visitInvoke(const InvokeInst &I) {
+       llvm_unreachable("Cannot invoke this intrinsic");
+     case Intrinsic::donothing:
+       // Ignore invokes to @llvm.donothing: jump directly to the next BB.
++    case Intrinsic::seh_try_begin:
++    case Intrinsic::eha_scope_begin:
++    case Intrinsic::seh_try_end:
++    case Intrinsic::eha_scope_end:
+       break;
+     case Intrinsic::experimental_patchpoint_void:
+     case Intrinsic::experimental_patchpoint_i64:
+@@ -6635,6 +6639,10 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
+       lowerCallToExternalSymbol(I, FunctionName);
+     return;
+   case Intrinsic::donothing:
++  case Intrinsic::seh_try_begin:
++  case Intrinsic::eha_scope_begin:
++  case Intrinsic::seh_try_end:
++  case Intrinsic::eha_scope_end:
+     // ignore
+     return;
+   case Intrinsic::experimental_stackmap:
+diff --git a/llvm/lib/IR/Verifier.cpp b/llvm/lib/IR/Verifier.cpp
+index c518ae87ea9..87dd063ee2e 100644
+--- a/llvm/lib/IR/Verifier.cpp
++++ b/llvm/lib/IR/Verifier.cpp
+@@ -4269,6 +4269,10 @@ void Verifier::visitInstruction(Instruction &I) {
+       Assert(
+           !F->isIntrinsic() || isa<CallInst>(I) ||
+               F->getIntrinsicID() == Intrinsic::donothing ||
++              F->getIntrinsicID() == Intrinsic::seh_try_begin ||
++              F->getIntrinsicID() == Intrinsic::seh_try_end ||
++              F->getIntrinsicID() == Intrinsic::eha_scope_begin ||
++              F->getIntrinsicID() == Intrinsic::eha_scope_end ||
+               F->getIntrinsicID() == Intrinsic::coro_resume ||
+               F->getIntrinsicID() == Intrinsic::coro_destroy ||
+               F->getIntrinsicID() == Intrinsic::experimental_patchpoint_void ||
