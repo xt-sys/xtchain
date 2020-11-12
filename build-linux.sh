@@ -321,6 +321,7 @@ llvm_build_runtime()
             -DCMAKE_SYSTEM_NAME="Windows" \
             -DCOMPILER_RT_DEFAULT_TARGET_ONLY=TRUE \
             -DCOMPILER_RT_USE_BUILTINS_LIBRARY=TRUE \
+            -DSANITIZER_CXX_ABI=libc++ \
             ../lib/builtins
             make -j${CORES}
             mkdir -p ${BINDIR}/lib/clang/${LLVMTAG#*-}/lib/windows
