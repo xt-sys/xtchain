@@ -1,0 +1,13 @@
+diff --git a/Source/CMakeVersion.cmake b/Source/CMakeVersion.cmake
+index 818109f0b7..749377d193 100644
+--- a/Source/CMakeVersion.cmake
++++ b/Source/CMakeVersion.cmake
+@@ -7,7 +7,7 @@ set(CMake_VERSION_IS_DIRTY 0)
+ 
+ # Start with the full version number used in tags.  It has no dev info.
+ set(CMake_VERSION
+-  "${CMake_VERSION_MAJOR}.${CMake_VERSION_MINOR}.${CMake_VERSION_PATCH}")
++  "${CMake_VERSION_MAJOR}.${CMake_VERSION_MINOR}.${CMake_VERSION_PATCH}-XTC")
+ if(DEFINED CMake_VERSION_RC)
+   set(CMake_VERSION "${CMake_VERSION}-rc${CMake_VERSION_RC}")
+ endif()

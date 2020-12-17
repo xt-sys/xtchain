@@ -18,7 +18,7 @@ GENERIC="generic-w64-mingw32"
 
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
-CMAKETAG="v3.18.1"
+CMAKETAG="v3.19.2"
 CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
