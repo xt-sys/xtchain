@@ -1,0 +1,13 @@
+diff --git a/src/job.c b/src/job.c
+index d6e28d3..f8f6950 100644
+--- a/src/job.c
++++ b/src/job.c
+@@ -2391,7 +2391,7 @@ child_execute_job (struct childbase *child, int good_stdin, char **argv)
+           }
+       }
+ 
+-    cmd = (char *)find_in_given_path (argv[0], p, 0);
++    cmd = (char *)find_in_given_path (argv[0], p, 0, false);
+   }
+ 
+   if (!cmd)
