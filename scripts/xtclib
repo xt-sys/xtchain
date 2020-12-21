@@ -21,7 +21,7 @@ charch()
             export TARGET="armv7"
             ;;
         "i386"|"i486"|"i586"|"i686"|"x86")
-            export TARGET="i386"
+            export TARGET="i686"
             ;;
         "amd64"|"x64"|"x86_64")
             export TARGET="amd64"
