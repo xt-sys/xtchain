@@ -33,6 +33,24 @@ charch()
 }
 export -f charch
 
+# Sets the build type
+chbuild()
+{
+    if [ "x${1}" == "x" ]; then
+        echo "Syntax: chbuild [DEBUG|RELEASE]"
+        return
+    fi
+    case ${1} in
+        [Rr][Ee][Ll][Ee][Aa][Ss][Ee])
+            export BUILD_TYPE="RELEASE"
+            ;;
+        *)
+            export BUILD_TYPE="DEBUG"
+    esac
+    echo "Target build type: ${BUILD_TYPE}"
+}
+export -f chbuild
+
 # Displays version banner
 version()
 {
@@ -49,6 +67,7 @@ version()
     echo "Wine Resource Compiler Version: $(${XTCDIR}/bin/wrc --version | grep 'version' | cut -d' ' -f5)"
     echo
     charch ${TARGET}
+    chbuild DEBUG
     echo
     echo
 }
