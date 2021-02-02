@@ -1,6 +1,6 @@
 ## XT Toolchain
 This is an the XT toolchain based on MinGW-W64. It currently supports C and C++, and provides
-a variety of tools. It can be used to build both Windows and XT software, including FerretOS.
+a variety of tools. It can be used to build both Windows and XT software, including XT OS.
 
 This repository contains 2 branches:
  * gnu-toolchain: This is the GCC/Binutils based mingw-w64 toolchain.
