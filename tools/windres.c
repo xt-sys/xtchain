@@ -87,7 +87,7 @@ static
 void print_version(void)
 {
     printf("XTchain windres (GNU windres compatible) %s\n", WINDRES_VERSION);
-    exit(-1);
+    exit(0);
 }
 
 static
@@ -126,7 +126,7 @@ void print_help(void)
     "  pei-x86-64\n"
     "  pe-i386\n"
     "  pei-i386\n");
-    exit(1);
+    exit(0);
 }
 
 static
