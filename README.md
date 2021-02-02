@@ -1,8 +1,8 @@
 ## XT Toolchain
 This is a GNU-based mingw-w64 toolchain. It currently supports C and C++, and provides a variety of
 tools including IDL, message and resource compilers. The XT Toolchain is also the official build
-environment for compiling XT software, including the FerretOS. Currently, it is targeted at Linux
-host only, however it should be possible to build it in MSYS2 as well.
+environment for compiling XT software, including the XT OS. Currently, it is targeted at Linux host
+only, however it should be possible to build it in MSYS2 as well.
 
 This software includes:
  * Binutils
