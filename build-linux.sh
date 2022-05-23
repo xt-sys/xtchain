@@ -18,7 +18,7 @@ GENERIC="generic-w64-mingw32"
 
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
-CMAKETAG="v3.19.2"
+CMAKETAG="v3.23.1"
 CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
@@ -45,12 +45,12 @@ NASMVCS="https://github.com/netwide-assembler/nasm.git"
 
 # Ninja Settings
 NINJADIR="${SRCDIR}/ninja"
-NINJATAG="v1.10.0"
+NINJATAG="v1.11.0"
 NINJAVCS="https://github.com/ninja-build/ninja.git"
 
 # Wine Settings
 WINEDIR="${SRCDIR}/wine"
-WINETAG="wine-5.15"
+WINETAG="wine-7.9"
 WINEVCS="git://source.winehq.org/git/wine.git"
 
 
@@ -559,7 +559,7 @@ wine_build()
         -enable-win64 \
         --without-x
     for TOOL in winedump wmc wrc; do
-        make -j${CORES} tools/${TOOL}
+        make -j${CORES} tools/${TOOL}/all
         cp tools/${TOOL}/${TOOL} ${BINDIR}/bin/
         for ARCH in ${ARCHS}; do
             if [ ! -e ${BINDIR}/bin/${ARCH}-w64-mingw32-${TOOL} ]; then
