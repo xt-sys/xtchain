@@ -1,0 +1,42 @@
+#!/bin/sh
+# PROJECT:     XTchain
+# LICENSE:     See the COPYING.md in the top level directory
+# FILE:        scripts/ld-wrapper
+# DESCRIPTION: LLD Wrapper
+# DEVELOPERS:  Martin Storsjo <martin@martin.st>
+#              Rafal Kupiec <belliash@codingworkshop.eu.org>
+
+
+# Set basic variables
+DIR="$(cd $(dirname $0) && pwd)"
+BASENAME="$(basename $0)"
+TARGET="${BASENAME%-*}"
+DEFAULT_TARGET="x86_64-w64-mingw32"
+
+# Update PATH
+export PATH="${DIR}":"${PATH}"
+
+# Set proper target
+if [ "${TARGET}" = "${BASENAME}" ]; then
+    TARGET="${DEFAULT_TARGET}"
+fi
+
+# Set target machine
+ARCH="${TARGET%%-*}"
+case ${ARCH} in
+    aarch64)
+        M="arm64pe"
+        ;;
+    armv7)
+        M="thumb2pe"
+        ;;
+    i686)
+        M="i386pe"
+        ;;
+    x86_64)
+        M="i386pep"
+        ;;
+esac
+
+# Launch the linker
+ld.lld -m ${M} "$@"
