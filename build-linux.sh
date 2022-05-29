@@ -139,28 +139,26 @@ llvm_build()
     cmake \
         -DCMAKE_BUILD_TYPE="Release" \
         -DCMAKE_INSTALL_PREFIX=${BINDIR} \
-        -DLLDB_ENABLE_CURSES=FALSE \
-        -DLLDB_ENABLE_LIBEDIT=FALSE \
-        -DLLDB_ENABLE_LUA=FALSE \
-        -DLLDB_ENABLE_PYTHON=FALSE \
         -DLLDB_INCLUDE_TESTS=FALSE \
         -DLLVM_ENABLE_ASSERTIONS=FALSE \
-        -DLLVM_INSTALL_TOOLCHAIN_ONLY=TRUE \
+        -DLLVM_ENABLE_PROJECTS="clang;lld;clang-tools-extra" \
+        -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
+        -DLLVM_LINK_LLVM_DYLIB=ON \
         -DLLVM_TARGETS_TO_BUILD="$(echo ${LLVM_ARCHS[@]} | tr ' ' ';')" \
-        -DLLVM_TOOLCHAIN_TOOLS="clang;llvm-addr2line;llvm-ar;llvm-as;llvm-cov;llvm-cvtres;llvm-dlltool;llvm-nm;llvm-objdump;llvm-objcopy;llvm-pdbutil;llvm-profdata;llvm-ranlib;llvm-rc;llvm-readobj;llvm-strings;llvm-strip;llvm-symbolizer" \
+        -DLLVM_TOOLCHAIN_TOOLS="llvm-addr2line;llvm-ar;llvm-as;llvm-cov;llvm-cvtres;llvm-dlltool;llvm-ml;llvm-nm;llvm-objdump;llvm-objcopy;llvm-pdbutil;llvm-profdata;llvm-ranlib;llvm-rc;llvm-readelf;llvm-readobj;llvm-strings;llvm-strip;llvm-symbolizer;llvm-windres" \
         ..
         make -j${CORES} install/strip
         cd ${WRKDIR}
 }
 
-# This function compiles and install LIBCXX
-llvm_build_libcxx()
+# This function compiles and install LIBCXX & LIBUNWIND
+llvm_build_libs()
 {
     echo ">>> Building LLVM libraries (libcxx) ..."
     for ARCH in ${ARCHS}; do
-        [ -z ${CLEAN} ] || rm -rf ${LLVMDIR}/libcxx/build-${ARCH}
-        mkdir -p ${LLVMDIR}/libcxx/build-${ARCH}
-        cd ${LLVMDIR}/libcxx/build-${ARCH}
+        [ -z ${CLEAN} ] || rm -rf ${LLVMDIR}/runtimes/build-${ARCH}
+        mkdir -p ${LLVMDIR}/runtimes/build-${ARCH}
+        cd ${LLVMDIR}/runtimes/build-${ARCH}
         cmake \
             -DCMAKE_BUILD_TYPE="Release" \
             -DCMAKE_INSTALL_PREFIX=${BINDIR}/${ARCH}-w64-mingw32 \
@@ -168,117 +166,32 @@ llvm_build_libcxx()
             -DCMAKE_C_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang" \
             -DCMAKE_C_COMPILER_WORKS=1 \
             -DCMAKE_CXX_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang++" \
+            -DCMAKE_CXX_COMPILER_TARGET=${ARCH}-w64-windows-gnu \
             -DCMAKE_CXX_COMPILER_WORKS=1 \
             -DCMAKE_CROSSCOMPILING=TRUE \
             -DCMAKE_RANLIB="${BINDIR}/bin/llvm-ranlib" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-lunwind" \
             -DCMAKE_SYSTEM_NAME="Windows" \
             -DLLVM_PATH="${LLVMDIR}/llvm" \
-            -DLIBCXX_CXX_ABI="libcxxabi" \
-            -DLIBCXX_CXX_ABI_INCLUDE_PATHS="../../libcxxabi/include" \
-            -DLIBCXX_CXX_ABI_LIBRARY_PATH="../../libcxxabi/build-${ARCH}/lib" \
-            -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=FALSE \
-            -DLIBCXX_ENABLE_EXCEPTIONS=TRUE \
-            -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=FALSE \
-            -DLIBCXX_ENABLE_FILESYSTEM=FALSE \
-            -DLIBCXX_ENABLE_MONOTONIC_CLOCK=TRUE \
-            -DLIBCXX_ENABLE_SHARED=TRUE \
-            -DLIBCXX_ENABLE_STATIC=TRUE \
-            -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=TRUE \
-            -DLIBCXX_ENABLE_THREADS=TRUE \
-            -DLIBCXX_HAS_WIN32_THREAD_API=TRUE \
-            -DLIBCXX_HAVE_CXX_ATOMICS_WITHOUT_LIB=TRUE \
-            -DLIBCXX_INCLUDE_TESTS=FALSE \
-            -DLIBCXX_INSTALL_HEADERS=TRUE \
-            -DLIBCXX_LIBDIR_SUFFIX="" \
-            -DLIBCXX_USE_COMPILER_RT=TRUE \
-            ..
-        make -j${CORES}
-        make install
-        ${BINDIR}/bin/llvm-ar qcsL \
-            ${BINDIR}/${ARCH}-w64-mingw32/lib/libc++.dll.a \
-            ${BINDIR}/${ARCH}-w64-mingw32/lib/libunwind.dll.a
-        ${BINDIR}/bin/llvm-ar qcsL \
-            ${BINDIR}/${ARCH}-w64-mingw32/lib/libc++.a \
-            ${BINDIR}/${ARCH}-w64-mingw32/lib/libunwind.a
-        if [ ! -e ${BINDIR}/${ARCH}-w64-mingw32/bin ]; then
-            mkdir -p ${BINDIR}/${ARCH}-w64-mingw32/bin
-        fi
-        cp lib/libc++.dll ${BINDIR}/${ARCH}-w64-mingw32/bin/
-    done
-    cd ${WRKDIR}
-}
-
-# This function compiles LIBCXXABI
-llvm_build_libcxxabi()
-{
-    echo ">>> Building LLVM libraries (libcxxabi) ..."
-    for ARCH in ${ARCHS}; do
-        [ -z ${CLEAN} ] || rm -rf ${LLVMDIR}/libcxxabi/build-${ARCH}
-        mkdir -p ${LLVMDIR}/libcxxabi/build-${ARCH}
-        cd ${LLVMDIR}/libcxxabi/build-${ARCH}
-        cmake \
-            -DCMAKE_BUILD_TYPE="Release" \
-            -DCMAKE_INSTALL_PREFIX=${BINDIR}/${ARCH}-w64-mingw32 \
-            -DCMAKE_AR="${BINDIR}/bin/llvm-ar" \
-            -DCMAKE_C_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang" \
-            -DCMAKE_C_COMPILER_WORKS=1 \
-            -DCMAKE_CROSSCOMPILING=TRUE \
-            -DCMAKE_CXX_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang++" \
-            -DCMAKE_CXX_COMPILER_WORKS=1 \
-            -DCMAKE_CXX_FLAGS="-D_LIBCPP_HAS_THREAD_API_WIN32 -D_LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS" \
-            -DCMAKE_RANLIB="${BINDIR}/bin/llvm-ranlib" \
-            -DCMAKE_SYSTEM_NAME="Windows" \
-            -DLLVM_PATH="${LLVMDIR}/llvm" \
-            -DLIBCXXABI_ENABLE_EXCEPTIONS=TRUE \
-            -DLIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=FALSE \
-            -DLIBCXXABI_ENABLE_SHARED=FALSE \
-            -DLIBCXXABI_ENABLE_THREADS=TRUE \
-            -DLIBCXXABI_LIBCXX_INCLUDES="../../libcxx/include" \
-            -DLIBCXXABI_LIBDIR_SUFFIX="" \
-            -DLIBCXXABI_TARGET_TRIPLE="${ARCH}-w64-mingw32" \
-            -DLIBCXXABI_USE_COMPILER_RT=TRUE \
-            ..
-        make -j${CORES}
-    done
-    cd ${WRKDIR}
-}
-
-# This function compiles and installs LIBUNWIND
-llvm_build_libunwind()
-{
-    echo ">>> Building LLVM libraries (libunwind) ..."
-    for ARCH in ${ARCHS}; do
-        [ -z ${CLEAN} ] || rm -rf ${LLVMDIR}/libunwind/build-${ARCH}
-        mkdir -p ${LLVMDIR}/libunwind/build-${ARCH}
-        cd ${LLVMDIR}/libunwind/build-${ARCH}
-        cmake \
-            -DCMAKE_BUILD_TYPE="Release" \
-            -DCMAKE_INSTALL_PREFIX=${BINDIR}/${ARCH}-w64-mingw32 \
-            -DCMAKE_AR="${BINDIR}/bin/llvm-ar" \
-            -DCMAKE_C_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang" \
-            -DCMAKE_C_COMPILER_WORKS=1 \
-            -DCMAKE_C_FLAGS="-Wno-dll-attribute-on-redeclaration" \
-            -DCMAKE_CROSSCOMPILING=TRUE \
-            -DCMAKE_CXX_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang++" \
-            -DCMAKE_CXX_COMPILER_WORKS=1 \
-            -DCMAKE_CXX_FLAGS="-Wno-dll-attribute-on-redeclaration" \
-            -DCMAKE_SYSTEM_NAME="Windows" \
-            -DCMAKE_RANLIB="${BINDIR}/bin/llvm-ranlib" \
-            -DLLVM_COMPILER_CHECKED=TRUE \
-            -DLLVM_PATH="${LLVMDIR}/llvm" \
-            -DLIBUNWIND_ENABLE_CROSS_UNWINDING=FALSE \
-            -DLIBUNWIND_ENABLE_SHARED=TRUE \
-            -DLIBUNWIND_ENABLE_STATIC=TRUE \
-            -DLIBUNWIND_ENABLE_THREADS=TRUE \
+            -DLLVM_ENABLE_RUNTIMES="libunwind;libcxxabi;libcxx" \
             -DLIBUNWIND_USE_COMPILER_RT=TRUE \
+            -DLIBUNWIND_ENABLE_SHARED=TRUE \
+            -DLIBUNWIND_ENABLE_STATIC=FALSE \
+            -DLIBCXX_USE_COMPILER_RT=ON \
+            -DLIBCXX_ENABLE_SHARED=TRUE \
+            -DLIBCXX_ENABLE_STATIC=FALSE \
+            -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF \
+            -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=TRUE \
+            -DLIBCXX_CXX_ABI=libcxxabi \
+            -DLIBCXX_LIBDIR_SUFFIX="" \
+            -DLIBCXX_INCLUDE_TESTS=FALSE \
+            -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=FALSE \
+            -DLIBCXXABI_USE_COMPILER_RT=ON \
+            -DLIBCXXABI_ENABLE_SHARED=OFF \
+            -DLIBCXXABI_LIBDIR_SUFFIX="" \
+            -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
             ..
         make -j${CORES}
         make install
-        if [ ! -e ${BINDIR}/${ARCH}-w64-mingw32/bin ]; then
-            mkdir -p ${BINDIR}/${ARCH}-w64-mingw32/bin
-        fi
-        cp lib/libunwind.dll ${BINDIR}/${ARCH}-w64-mingw32/bin/
     done
     cd ${WRKDIR}
 }
@@ -291,32 +204,13 @@ llvm_build_runtime()
         [ -z ${CLEAN} ] || rm -rf ${LLVMDIR}/compiler-rt/build-${ARCH}
         mkdir -p ${LLVMDIR}/compiler-rt/build-${ARCH}
         cd ${LLVMDIR}/compiler-rt/build-${ARCH}
-        case ${ARCH} in
-            "armv7")
-                BARCH="armv7"
-                LARCH="arm"
-                ;;
-            "i686")
-                if [ ! -e ${BINDIR}/i386-w64-mingw32 ]; then
-                    ln -sf i686-w64-mingw32 ${BINDIR}/i386-w64-mingw32
-                fi
-                BARCH="i386"
-                LARCH="i386"
-                ;;
-            *)
-                BARCH="${ARCH}"
-                LARCH="${ARCH}"
-                ;;
-        esac
         cmake \
             -DCMAKE_BUILD_TYPE="Release" \
-            -DCMAKE_INSTALL_PREFIX=${BINDIR}/${ARCH}-w64-mingw32 \
             -DCMAKE_AR="${BINDIR}/bin/llvm-ar" \
             -DCMAKE_C_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang" \
-            -DCMAKE_C_COMPILER_TARGET="${BARCH}-windows-gnu" \
-            -DCMAKE_C_COMPILER_WORKS=1 \
+            -DCMAKE_C_COMPILER_TARGET="${ARCH}-windows-gnu" \
             -DCMAKE_CXX_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang++" \
-            -DCMAKE_CXX_COMPILER_WORKS=1 \
+            -DCMAKE_INSTALL_PREFIX=${BINDIR}/lib/clang/${LLVMTAG##*-} \
             -DCMAKE_RANLIB="${BINDIR}/bin/llvm-ranlib" \
             -DCMAKE_SYSTEM_NAME="Windows" \
             -DCOMPILER_RT_DEFAULT_TARGET_ONLY=TRUE \
@@ -324,10 +218,7 @@ llvm_build_runtime()
             -DSANITIZER_CXX_ABI=libc++ \
             ../lib/builtins
             make -j${CORES}
-            mkdir -p ${BINDIR}/lib/clang/${LLVMTAG#*-}/lib/windows
-            for LIB in lib/windows/libclang_rt.*.a; do
-                cp ${LIB} ${BINDIR}/lib/clang/${LLVMTAG#*-}/lib/windows/$(basename ${LIB} | sed s/${BARCH}/${LARCH}/)
-            done
+            make install
     done
     cd ${WRKDIR}
 }
@@ -658,16 +549,14 @@ mingw_build_crt
 # Build and install LLVM compiler runtime
 llvm_build_runtime
 
+# Build and install LLVM compiler libraries
+llvm_build_libs
+
 # Build and install Mingw-W64 libraries
 mingw_build_libs
 
 # Build and install Mingw-W64 tools
 mingw_build_tools
-
-# Build LLVM libraries
-llvm_build_libunwind
-llvm_build_libcxxabi
-llvm_build_libcxx
 
 # Download Wine
 wine_fetch
