@@ -23,7 +23,7 @@ CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-14.0.4"
+LLVMTAG="llvmorg-14.0.5"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Make Settings
@@ -129,7 +129,7 @@ llvm_build()
     done
     LLVM_ARCHS=( $(for ARCH in ${LLVM_ARCHS[@]}; do echo ${ARCH}; done | sort -u) )
     cd ${LLVMDIR}/llvm/tools
-    for UTIL in clang lld lldb; do
+    for UTIL in clang lld; do
         if [ ! -e ${UTIL} ]; then
             ln -sf ../../${UTIL} .
         fi
@@ -141,7 +141,7 @@ llvm_build()
         -DCMAKE_INSTALL_PREFIX=${BINDIR} \
         -DLLDB_INCLUDE_TESTS=FALSE \
         -DLLVM_ENABLE_ASSERTIONS=FALSE \
-        -DLLVM_ENABLE_PROJECTS="clang;lld;clang-tools-extra" \
+        -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" \
         -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
         -DLLVM_LINK_LLVM_DYLIB=ON \
         -DLLVM_TARGETS_TO_BUILD="$(echo ${LLVM_ARCHS[@]} | tr ' ' ';')" \
