@@ -1,8 +1,5 @@
-kind: pipeline
-type: exec
-name: XT Toolchain Pipeline
-
-steps:
-- name: Compile XT Toolchain
-  commands:
-    - sh build-linux.sh
+pipeline:
+  build:
+    image: codingworkshop/oscw-runner:latest
+    commands:
+      - sh build-linux.sh
