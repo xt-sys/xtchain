@@ -6,12 +6,6 @@
 # DEVELOPERS:  Rafal Kupiec <belliash@codingworkshop.eu.org>
 
 
-# Check if script launched as root
-if [ "$(whoami)" = "root" ]; then
-    echo "This script cannot be run as root!"
-    exit 1
-fi
-
 # Get the absolute path to the XTchain
 export XTCDIR="$(realpath $(dirname ${0}))"
 
