@@ -448,6 +448,7 @@ wine_build()
     cd ${WINEDIR}/build
     ../configure \
         -enable-win64 \
+        --without-freetype \
         --without-x
     for TOOL in winedump wmc wrc; do
         make -j${CORES} tools/${TOOL}/all
@@ -507,16 +508,12 @@ xtchain_build()
 # Exit immediately on any failure
 set -e
 
-# Check if script launched as root
-if [ "$(whoami)" = "root" ]; then
-    echo "This script cannot be run as root!"
-    exit 1
-fi
-
 # Check number of CPU cores available
-: ${CORES:=$(sysctl -n hw.ncpu 2>/dev/null)}
-: ${CORES:=$(nproc 2>/dev/null)}
-: ${CORES:=1}
+if [[ ! -n ${CORES} ]]; then
+	: ${CORES:=$(sysctl -n hw.ncpu 2>/dev/null)}
+	: ${CORES:=$(nproc 2>/dev/null)}
+	: ${CORES:=1}
+fi
 
 # Create working directories
 mkdir -p ${BINDIR}

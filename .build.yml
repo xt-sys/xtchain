@@ -2,4 +2,13 @@ pipeline:
   build:
     image: codingworkshop/oscw-runner:latest
     commands:
-      - sh build-linux.sh
+      - CORES=10 ./build-linux.sh
+  publish:
+    image: codingworkshop/oscw-runner:latest
+    secrets:
+      - OSCW_GITHUB_USERNAME
+      - OSCW_GITHUB_PASSWORD
+    when:
+      event: tag
+    commands:
+      - github_publish $OSCW_GITHUB_USERNAME $OSCW_GITHUB_PASSWORD $(ls xtchain-*-linux.tar.zst)
