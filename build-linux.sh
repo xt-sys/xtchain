@@ -145,7 +145,7 @@ llvm_build()
         -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
         -DLLVM_LINK_LLVM_DYLIB=ON \
         -DLLVM_TARGETS_TO_BUILD="$(echo ${LLVM_ARCHS[@]} | tr ' ' ';')" \
-        -DLLVM_TOOLCHAIN_TOOLS="llvm-addr2line;llvm-ar;llvm-as;llvm-cov;llvm-cvtres;llvm-dlltool;llvm-ml;llvm-nm;llvm-objdump;llvm-objcopy;llvm-pdbutil;llvm-profdata;llvm-ranlib;llvm-rc;llvm-readelf;llvm-readobj;llvm-strings;llvm-strip;llvm-symbolizer;llvm-windres" \
+        -DLLVM_TOOLCHAIN_TOOLS="llvm-addr2line;llvm-ar;llvm-as;llvm-cov;llvm-cvtres;llvm-dlltool;llvm-lib;llvm-ml;llvm-nm;llvm-objdump;llvm-objcopy;llvm-pdbutil;llvm-profdata;llvm-ranlib;llvm-rc;llvm-readelf;llvm-readobj;llvm-strings;llvm-strip;llvm-symbolizer;llvm-windres" \
         ..
         make -j${CORES} install/strip
         cd ${WRKDIR}
