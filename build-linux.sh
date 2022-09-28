@@ -18,12 +18,12 @@ GENERIC="generic-w64-mingw32"
 
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
-CMAKETAG="v3.23.1"
+CMAKETAG="v3.24.2"
 CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-14.0.6"
+LLVMTAG="llvmorg-15.0.1"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Make Settings
@@ -34,7 +34,7 @@ MAKEVCS="git://git.savannah.gnu.org/make"
 # Mingw-w64 Settings
 MINGWDIR="${SRCDIR}/mingw-w64"
 MINGWLIB="ucrt"
-MINGWTAG="v10.0.0"
+MINGWTAG="master"
 MINGWNTV="0x601"
 MINGWVCS="https://github.com/mirror/mingw-w64.git"
 
@@ -385,7 +385,9 @@ mingw_fetch()
         echo ">>> Downloading MinGW-w64 ..."
         git clone ${MINGWVCS} ${MINGWDIR}
         cd ${MINGWDIR}
-        git checkout tags/${MINGWTAG}
+        if [ x"${MINGWTAG}" != x"master" ]; then
+            git checkout tags/${MINGWTAG}
+        fi
         apply_patches ${MINGWDIR##*/} ${MINGWTAG}
         cd ${WRKDIR}
     fi
