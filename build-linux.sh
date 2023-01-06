@@ -502,6 +502,7 @@ xtchain_build()
             ln -sf ${EXEC} ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}
         done
     done
+    cp ${WRKDIR}/scripts/exetool ${BINDIR}/bin/
     cp ${WRKDIR}/scripts/xtclib ${BINDIR}/lib/xtchain/
     cp ${WRKDIR}/scripts/xtchain ${BINDIR}/
 }
