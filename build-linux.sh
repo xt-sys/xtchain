@@ -16,6 +16,11 @@ WRKDIR="$(pwd)"
 ARCHS="aarch64 armv7 i686 x86_64"
 GENERIC="generic-w64-mingw32"
 
+# Binutils Settings
+BINUTILSDIR="${SRCDIR}/binutils"
+BINUTILSTAG="binutils-2_40"
+BINUTILSVCS="git://sourceware.org/git/binutils-gdb.git"
+
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
 CMAKETAG="v3.24.2"
@@ -23,7 +28,7 @@ CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-15.0.7"
+LLVMTAG="llvmorg-16.0.0"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Make Settings
@@ -76,6 +81,51 @@ apply_patches()
                 done
             fi
         done
+    fi
+}
+
+# This function compiles and installs GNU BINUTILS
+binutils_build()
+{
+    echo ">>> Building BINUTILS ..."
+    for ARCH in ${ARCHS}; do
+        [ -z ${CLEAN} ] || rm -rf ${BINUTILSDIR}/build-${ARCH}
+        mkdir -p ${BINUTILSDIR}/build-${ARCH}
+        cd ${BINUTILSDIR}/build-${ARCH}
+        case ${ARCH} in
+            "armv7")
+                TARGET="arm"
+                ;;
+            *)
+                TARGET="${ARCH}"
+                ;;
+        esac
+        ../configure \
+            --target=${TARGET}-w64-mingw32 \
+            --disable-binutils \
+            --disable-gdb \
+            --disable-gprof \
+            --disable-ld \
+            --disable-multilib \
+            --disable-nls \
+            --disable-werror \
+            --with-zlib=yes
+        make -j${CORES}
+        cp ${BINUTILSDIR}/build-${ARCH}/gas/as-new ${BINDIR}/bin/${ARCH}-w64-mingw32-gas
+    done
+    cd ${WRKDIR}
+}
+
+# This function downloads GNU BINUTILS from VCS
+binutils_fetch()
+{
+    if [ ! -d ${BINUTILSDIR} ]; then
+        echo ">>> Downloading BINUTILS ..."
+        git clone ${BINUTILSVCS} ${BINUTILSDIR}
+        cd ${BINUTILSDIR}
+        git checkout tags/${BINUTILSTAG}
+        apply_patches ${BINUTILSDIR##*/} ${BINUTILSTAG##*-}
+        cd ${WRKDIR}
     fi
 }
 
@@ -530,6 +580,12 @@ llvm_fetch
 
 # Build and install LLVM
 llvm_build
+
+# Download Binutils
+binutils_fetch
+
+# Build and install Binutils
+binutils_build
 
 # Download NASM
 nasm_fetch
