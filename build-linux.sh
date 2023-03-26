@@ -454,31 +454,6 @@ nasm_build()
     cd ${WRKDIR}
 }
 
-# This function downloads NASM from VCS
-nasm_fetch()
-{
-    if [ ! -d ${NASMDIR} ]; then
-        echo ">>> Downloading NASM ..."
-        git clone ${NASMVCS} ${NASMDIR}
-        cd ${NASMDIR}
-        git checkout tags/${NASMTAG}
-        apply_patches ${NASMDIR##*/} ${NASMTAG##*-}
-        cd ${WRKDIR}
-    fi
-}
-
-# This function compiles and installs NINJA
-ninja_build()
-{
-    echo ">>> Building NINJA ..."
-    [ -z ${CLEAN} ] || rm -rf ${NINJADIR}/build-${GENERIC}
-    mkdir -p ${NINJADIR}/build-${GENERIC}
-    cd ${NINJADIR}/build-${GENERIC}
-    ../configure.py --bootstrap
-    install ninja ${BINDIR}/bin/
-    cd ${WRKDIR}
-}
-
 # This function downloads NINJA from VCS
 ninja_fetch()
 {
