@@ -186,18 +186,18 @@ llvm_build()
     done
     mkdir -p ${LLVMDIR}/llvm/build
     cd ${LLVMDIR}/llvm/build
-    cmake \
+    cmake -G Ninja \
         -DCMAKE_BUILD_TYPE="Release" \
         -DCMAKE_INSTALL_PREFIX=${BINDIR} \
         -DLLDB_INCLUDE_TESTS=FALSE \
         -DLLVM_ENABLE_ASSERTIONS=FALSE \
-        -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" \
+        -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;lldb" \
         -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
         -DLLVM_LINK_LLVM_DYLIB=ON \
         -DLLVM_TARGETS_TO_BUILD="$(echo ${LLVM_ARCHS[@]} | tr ' ' ';')" \
         -DLLVM_TOOLCHAIN_TOOLS="llvm-addr2line;llvm-ar;llvm-as;llvm-cov;llvm-cvtres;llvm-dlltool;llvm-lib;llvm-ml;llvm-nm;llvm-objdump;llvm-objcopy;llvm-pdbutil;llvm-profdata;llvm-ranlib;llvm-rc;llvm-readelf;llvm-readobj;llvm-strings;llvm-strip;llvm-symbolizer;llvm-windres" \
         ..
-        make -j${CORES} install/strip
+        ninja install/strip
         cd ${WRKDIR}
 }
 
@@ -209,15 +209,17 @@ llvm_build_libs()
         [ -z ${CLEAN} ] || rm -rf ${LLVMDIR}/runtimes/build-${ARCH}
         mkdir -p ${LLVMDIR}/runtimes/build-${ARCH}
         cd ${LLVMDIR}/runtimes/build-${ARCH}
-        cmake \
+        cmake -G Ninja \
             -DCMAKE_BUILD_TYPE="Release" \
-            -DCMAKE_INSTALL_PREFIX=${BINDIR}/${ARCH}-w64-mingw32 \
+            -DCMAKE_INSTALL_PREFIX="${BINDIR}/${ARCH}-w64-mingw32" \
             -DCMAKE_AR="${BINDIR}/bin/llvm-ar" \
             -DCMAKE_C_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang" \
             -DCMAKE_C_COMPILER_WORKS=1 \
+            -DCMAKE_C_FLAGS_INIT=-mguard=cf \
             -DCMAKE_CXX_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang++" \
             -DCMAKE_CXX_COMPILER_TARGET=${ARCH}-w64-windows-gnu \
             -DCMAKE_CXX_COMPILER_WORKS=1 \
+            -DCMAKE_CXX_FLAGS_INIT=-mguard=cf \
             -DCMAKE_CROSSCOMPILING=TRUE \
             -DCMAKE_RANLIB="${BINDIR}/bin/llvm-ranlib" \
             -DCMAKE_SYSTEM_NAME="Windows" \
@@ -225,13 +227,13 @@ llvm_build_libs()
             -DLLVM_ENABLE_RUNTIMES="libunwind;libcxxabi;libcxx" \
             -DLIBUNWIND_USE_COMPILER_RT=TRUE \
             -DLIBUNWIND_ENABLE_SHARED=TRUE \
-            -DLIBUNWIND_ENABLE_STATIC=FALSE \
+            -DLIBUNWIND_ENABLE_STATIC=TRUE \
             -DLIBCXX_USE_COMPILER_RT=ON \
             -DLIBCXX_ENABLE_SHARED=TRUE \
-            -DLIBCXX_ENABLE_STATIC=FALSE \
+            -DLIBCXX_ENABLE_STATIC=TRUE \
             -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF \
             -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=TRUE \
-            -DLIBCXX_CXX_ABI=libcxxabi \
+            -DLIBCXX_CXX_ABI="libcxxabi" \
             -DLIBCXX_LIBDIR_SUFFIX="" \
             -DLIBCXX_INCLUDE_TESTS=FALSE \
             -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=FALSE \
@@ -240,8 +242,8 @@ llvm_build_libs()
             -DLIBCXXABI_LIBDIR_SUFFIX="" \
             -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
             ..
-        make -j${CORES}
-        make install
+        ninja
+        ninja install
     done
     cd ${WRKDIR}
 }
@@ -254,21 +256,28 @@ llvm_build_runtime()
         [ -z ${CLEAN} ] || rm -rf ${LLVMDIR}/compiler-rt/build-${ARCH}
         mkdir -p ${LLVMDIR}/compiler-rt/build-${ARCH}
         cd ${LLVMDIR}/compiler-rt/build-${ARCH}
-        cmake \
+        cmake -G Ninja \
             -DCMAKE_BUILD_TYPE="Release" \
             -DCMAKE_AR="${BINDIR}/bin/llvm-ar" \
             -DCMAKE_C_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang" \
             -DCMAKE_C_COMPILER_TARGET="${ARCH}-windows-gnu" \
+            -DCMAKE_C_FLAGS_INIT="-mguard=cf" \
             -DCMAKE_CXX_COMPILER="${BINDIR}/bin/${ARCH}-w64-mingw32-clang++" \
+            -DCMAKE_CXX_FLAGS_INIT="-mguard=cf" \
+            -DCMAKE_FIND_ROOT_PATH="${BINDIR}/${ARCH}-w64-mingw32" \
+            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
             -DCMAKE_INSTALL_PREFIX=${BINDIR}/lib/clang/${LLVMTAG##*-} \
             -DCMAKE_RANLIB="${BINDIR}/bin/llvm-ranlib" \
             -DCMAKE_SYSTEM_NAME="Windows" \
+            -DCOMPILER_RT_BUILD_BUILTINS=TRUE \
             -DCOMPILER_RT_DEFAULT_TARGET_ONLY=TRUE \
             -DCOMPILER_RT_USE_BUILTINS_LIBRARY=TRUE \
-            -DSANITIZER_CXX_ABI=libc++ \
+            -DLLVM_CONFIG_PATH="" \
+            -DSANITIZER_CXX_ABI="libc++" \
             ../lib/builtins
-            make -j${CORES}
-            make install
+            ninja
+            ninja install
     done
     cd ${WRKDIR}
 }
@@ -561,12 +570,6 @@ binutils_fetch
 
 # Build and install Binutils
 binutils_build
-
-# Download NASM
-nasm_fetch
-
-# Build and install NASM
-nasm_build
 
 # Download Mingw-W64
 mingw_fetch
