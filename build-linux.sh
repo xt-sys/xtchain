@@ -267,7 +267,7 @@ llvm_build_runtime()
             -DCMAKE_FIND_ROOT_PATH="${BINDIR}/${ARCH}-w64-mingw32" \
             -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
             -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
-            -DCMAKE_INSTALL_PREFIX=${BINDIR}/lib/clang/${LLVMTAG##*-} \
+            -DCMAKE_INSTALL_PREFIX=$(${BINDIR}/bin/${ARCH}-w64-mingw32-clang --print-resource-dir) \
             -DCMAKE_RANLIB="${BINDIR}/bin/llvm-ranlib" \
             -DCMAKE_SYSTEM_NAME="Windows" \
             -DCOMPILER_RT_BUILD_BUILTINS=TRUE \
@@ -361,6 +361,7 @@ mingw_build_crt()
             --prefix=${BINDIR}/${ARCH}-w64-mingw32 \
             --with-sysroot=${BINDIR} \
             --with-default-msvcrt=${MINGWLIB} \
+            --enable-cfguard \
             ${FLAGS}
         make -j${CORES}
         make install
@@ -406,7 +407,9 @@ mingw_build_libs()
             ../configure \
                 --host=${ARCH}-w64-mingw32 \
                 --prefix=${BINDIR}/${ARCH}-w64-mingw32 \
-                --libdir=${BINDIR}/${ARCH}-w64-mingw32/lib
+                --libdir=${BINDIR}/${ARCH}-w64-mingw32/lib \
+                CFLAGS="-O2 -mguard=cf" \
+                CXXFLAGS="-O2 -mguard=cf"
             make -j${CORES}
             make install
             PATH="${ORIGPATH}"
@@ -565,12 +568,6 @@ llvm_fetch
 # Build and install LLVM
 llvm_build
 
-# Download Binutils
-binutils_fetch
-
-# Build and install Binutils
-binutils_build
-
 # Download Mingw-W64
 mingw_fetch
 
@@ -591,6 +588,12 @@ mingw_build_libs
 
 # Build and install Mingw-W64 tools
 mingw_build_tools
+
+# Download Binutils
+binutils_fetch
+
+# Build and install Binutils
+binutils_build
 
 # Download Wine
 wine_fetch
@@ -619,7 +622,7 @@ ninja_build
 # Remove unneeded files to save disk space
 echo ">>> Removing unneeded files to save disk space ..."
 rm -rf ${BINDIR}/{doc,include,share/{bash-completion,emacs,info,locale,man,vim}}
-rm -rf ${BINDIR}/bin/{clang-{check,exdef-mapping,import-test,offload-*,rename,scan-deps},hmaptool,ld64.lld,wasm-ld}
+rm -rf ${BINDIR}/bin/amdgpu-arch,{clang-{check,exdef-mapping,import-test,offload-*,rename,scan-deps},diagtool,hmaptool,ld64.lld,modularize,nxptx-arch,wasm-ld}
 
 # Save XT Toolchain version
 cd ${WRKDIR}
