@@ -455,14 +455,15 @@ mingw_fetch()
     fi
 }
 
-# This function compiles and installs NASM
-nasm_build()
+# This function compiles and installs NINJA
+ninja_build()
 {
-    cd ${NASMDIR}
-    ./autogen.sh
-    ./configure
-    make -j${CORES}
-    install nasm ndisasm ${BINDIR}/bin/
+    echo ">>> Building NINJA ..."
+    [ -z ${CLEAN} ] || rm -rf ${NINJADIR}/build-${GENERIC}
+    mkdir -p ${NINJADIR}/build-${GENERIC}
+    cd ${NINJADIR}/build-${GENERIC}
+    ../configure.py --bootstrap
+    install ninja ${BINDIR}/bin/
     cd ${WRKDIR}
 }
 
