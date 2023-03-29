@@ -55,7 +55,7 @@ export -f chbuild
 version()
 {
     echo "###############################################################################"
-    echo "#                        XT Toolchain v${XTCVER} for Linux                          #"
+    echo "#                        XT Toolchain v${XTCVER} for Linux                        #"
     echo "#               by Rafal Kupiec <belliash@codingworkshop.eu.org>              #"
     echo "###############################################################################"
     echo

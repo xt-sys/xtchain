@@ -628,7 +628,7 @@ rm -rf ${BINDIR}/bin/amdgpu-arch,{clang-{check,exdef-mapping,import-test,offload
 # Save XT Toolchain version
 cd ${WRKDIR}
 : ${XTCVER:=$(git describe --exact-match --tags 2>/dev/null)}
-: ${XTCVER:=DEV}
+: ${XTCVER:=DEVEL}
 echo "${XTCVER}" > ${BINDIR}/Version
 
 # Prepare archive
