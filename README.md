@@ -31,10 +31,10 @@ Benefits of a LLVM based MinGW toolchain are:
 
 This software includes:
  * CMake
+ * GNU Assembler
  * LLVM
  * Make
  * Mingw-w64
- * NASM
  * Ninja
  * Wine
 
