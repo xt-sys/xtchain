@@ -28,7 +28,7 @@ CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-16.0.0"
+LLVMTAG="llvmorg-16.0.4"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Make Settings
@@ -533,14 +533,13 @@ xtchain_build()
         for EXEC in dlltool ld objdump; do
             ln -sf ../${GENERIC}/bin/${EXEC}-wrapper ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}
         done
-        for EXEC in windres xtcspecc; do
+        for EXEC in exetool windres xtcspecc; do
             if [ ! -e ${BINDIR}/bin/${EXEC} ]; then
                 gcc ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}
             fi
             ln -sf ${EXEC} ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}
         done
     done
-    cp ${WRKDIR}/scripts/exetool ${BINDIR}/bin/
     cp ${WRKDIR}/scripts/xtclib ${BINDIR}/lib/xtchain/
     cp ${WRKDIR}/scripts/xtchain ${BINDIR}/
 }
