@@ -1,0 +1,20 @@
+name: Builds
+run-name: ${{ github.actor }} runs Gitea Actions
+on: [push]
+
+jobs:
+  XTChain:
+    runs-on: oscw
+    container:
+      image: codingworkshop/oscw-runner:latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - name: Build XTChain
+        run: CORES=10 ./build-linux.sh
+      - name: Publish binaries
+        if: github.ref_type == 'tag'
+        env:
+          OSCW_GITHUB_USERNAME: ${{ secrets.OSCW_GITHUB_USERNAME }}
+          OSCW_GITHUB_PASSWORD: ${{ secrets.OSCW_GITHUB_PASSWORD }}
+        run: github_publish $OSCW_GITHUB_USERNAME $OSCW_GITHUB_PASSWORD $(ls xtchain-*-linux.tar.zst)
