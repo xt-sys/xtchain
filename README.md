@@ -2,8 +2,8 @@
   <a href="https://git.codingworkshop.eu.org/xt-sys/xtchain">
     <img alt="GIT Repository" src="https://img.shields.io/badge/Source-GIT-purple">
   </a>
-  <a href="https://ci.codingworkshop.eu.org/xt-sys/xtchain">
-    <img alt="Build Status" src="https://ci.codingworkshop.eu.org/api/badges/xt-sys/xtchain/status.svg">
+  <a href="https://git.codingworkshop.eu.org/xt-sys/xtchain/actions">
+    <img alt="Build Status" src="https://codingworkshop.eu.org/actions.php?project=xt-sys/xtchain">
   </a>
   <a href="https://git.codingworkshop.eu.org/xt-sys/xtchain/src/branch/master/COPYING.md">
     <img alt="License" src="https://img.shields.io/badge/License-GPLv3-blue.svg">
