@@ -43,11 +43,6 @@ MINGWTAG="master"
 MINGWNTV="0x601"
 MINGWVCS="https://github.com/mirror/mingw-w64.git"
 
-# NASM Settings
-NASMDIR="${SRCDIR}/nasm"
-NASMTAG="nasm-2.15.05"
-NASMVCS="https://github.com/netwide-assembler/nasm.git"
-
 # Ninja Settings
 NINJADIR="${SRCDIR}/ninja"
 NINJATAG="v1.11.0"
