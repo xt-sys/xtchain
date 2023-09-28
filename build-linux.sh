@@ -528,7 +528,7 @@ xtchain_build()
         for EXEC in dlltool ld objdump; do
             ln -sf ../${GENERIC}/bin/${EXEC}-wrapper ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}
         done
-        for EXEC in exetool windres xtcspecc; do
+        for EXEC in bin2c exetool windres xtcspecc; do
             if [ ! -e ${BINDIR}/bin/${EXEC} ]; then
                 gcc ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}
             fi
