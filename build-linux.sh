@@ -18,22 +18,22 @@ GENERIC="generic-w64-mingw32"
 
 # Binutils Settings
 BINUTILSDIR="${SRCDIR}/binutils"
-BINUTILSTAG="binutils-2_40"
+BINUTILSTAG="binutils-2_41"
 BINUTILSVCS="git://sourceware.org/git/binutils-gdb.git"
 
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
-CMAKETAG="v3.24.2"
+CMAKETAG="v3.27.6"
 CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-17.0.1"
+LLVMTAG="llvmorg-17.0.2"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Make Settings
 MAKEDIR="${SRCDIR}/make"
-MAKETAG="4.3"
+MAKETAG="4.4.1"
 MAKEVCS="git://git.savannah.gnu.org/make"
 
 # Mingw-w64 Settings
@@ -45,12 +45,12 @@ MINGWVCS="https://github.com/mirror/mingw-w64.git"
 
 # Ninja Settings
 NINJADIR="${SRCDIR}/ninja"
-NINJATAG="v1.11.0"
+NINJATAG="v1.11.1"
 NINJAVCS="https://github.com/ninja-build/ninja.git"
 
 # Wine Settings
 WINEDIR="${SRCDIR}/wine"
-WINETAG="wine-7.9"
+WINETAG="wine-8.17"
 WINEVCS="git://source.winehq.org/git/wine.git"
 
 
