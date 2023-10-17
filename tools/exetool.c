@@ -15,6 +15,7 @@ typedef struct _PE_SUBSYSTEM
 } PE_SUBSYSTEM, *PPE_SUBSYSTEM;
 
 static PE_SUBSYSTEM SubSystems[] = {
+    {0x00, "INVALID_SUBSYSTEM"},
     {0x01, "NT_NATIVE"},
     {0x02, "WINDOWS_GUI"},
     {0x03, "WINDOWS_CLI"},
@@ -37,7 +38,7 @@ static PE_SUBSYSTEM SubSystems[] = {
     {0x19, "XT_APPLICATION_GDI"}
 };
 
-int getSubSystemID(char *Name)
+PPE_SUBSYSTEM getSubSystem(char *Name)
 {
     int Index;
     int SubSystemsCount;
@@ -50,15 +51,39 @@ int getSubSystemID(char *Name)
     for(Index = 0; Index < SubSystemsCount; Index++)
     {
         SubSystem = &SubSystems[Index];
-        if(strcmp(SubSystem->Name, Name) == 0)
+        if(strcasecmp(SubSystem->Name, Name) == 0)
         {
             /* Subsystem found, return its ID */
-            return SubSystem->Identifier;
+            return SubSystem;
         }
     }
 
 	/* No valid subsystem found */
-    return 0x00;
+    return &SubSystems[0];
+}
+
+char *getSubSystemName(int Identifier)
+{
+    int Index;
+    int SubSystemsCount;
+    PPE_SUBSYSTEM SubSystem;
+
+    /* Count number of subsystems avaialble */
+    SubSystemsCount = sizeof(SubSystems) / sizeof(PE_SUBSYSTEM);
+
+    /* Find subsystem */
+    for(Index = 0; Index < SubSystemsCount; Index++)
+    {
+        SubSystem = &SubSystems[Index];
+        if(SubSystem->Identifier == Identifier)
+        {
+            /* Subsystem found, return its ID */
+            return SubSystem->Name;
+        }
+    }
+
+	/* No valid subsystem found */
+    return SubSystems[0].Name;
 }
 
 int main(int argc, char *argv[])
@@ -67,7 +92,7 @@ int main(int argc, char *argv[])
     unsigned char Signature[4];
     unsigned int HeaderOffset;
     unsigned short SubSystem;
-    int NewSubSystem;
+    PPE_SUBSYSTEM NewSubSystem;
 
     /* Check for proper number of arguments */
     if(argc != 3)
@@ -113,11 +138,11 @@ int main(int argc, char *argv[])
 
     /* Read the current SubSystem value */
     fread(&SubSystem, sizeof(unsigned short), 1, ExeFile);
-    printf("Original SubSystem: 0x%04X\n", SubSystem);
+    printf("Original SubSystem: 0x%04X <%s>\n", SubSystem, getSubSystemName(SubSystem));
 
     /* Parse the new SubSystem value from the command line argument */
-    NewSubSystem = getSubSystemID(argv[2]);
-    if(NewSubSystem == 0)
+    NewSubSystem = getSubSystem(argv[2]);
+    if(NewSubSystem->Identifier == 0)
     {
         /* Invalid SubSystem provided */
         printf("Error: %s is not a valid PE SubSystem\n", argv[2]);
@@ -125,13 +150,13 @@ int main(int argc, char *argv[])
     }
 
     /* Print new SubSystem identifier */
-    printf("New SubSystem: 0x%04X\n", NewSubSystem);
+    printf("New SubSystem: 0x%04X <%s>\n", NewSubSystem->Identifier, NewSubSystem->Name);
 
     /* Seek back to the SubSystem field in the optional header */
     fseek(ExeFile, -sizeof(unsigned short), SEEK_CUR);
 
     /* Write the new SubSystem value */
-    fwrite(&NewSubSystem, sizeof(unsigned short), 1, ExeFile);
+    fwrite(&NewSubSystem->Identifier, sizeof(unsigned short), 1, ExeFile);
 
     /* Close the file */
     fclose(ExeFile);
