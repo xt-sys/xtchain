@@ -5,6 +5,9 @@
   <a href="https://git.codingworkshop.eu.org/xt-sys/xtchain/actions">
     <img alt="Build Status" src="https://codingworkshop.eu.org/actions.php?project=xt-sys/xtchain">
   </a>
+  <a href="https://github.com/xt-sys/xtchain/releases">
+    <img alt="Releases" src="https://img.shields.io/github/v/release/xt-sys/xtchain?label=Release">
+  </a>
   <a href="https://git.codingworkshop.eu.org/xt-sys/xtchain/src/branch/master/COPYING.md">
     <img alt="License" src="https://img.shields.io/badge/License-GPLv3-blue.svg">
   </a>
