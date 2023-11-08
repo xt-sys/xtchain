@@ -51,6 +51,19 @@ chbuild()
 }
 export -f chbuild
 
+# Prints help
+help()
+{
+	version
+	echo "XTChain defines an internal list of commands:"
+	echo " * charch [arch]   - sets the target CPU architecture [aarch64/armv7/i686/amd64]"
+	echo " * chbuild [type]  - sets build type [debug/release]"
+	echo " * help            - prints this message"
+	echo " * version         - prints XTChain and its components version"
+	echo " * xbuild          - builds an application with a Ninja build system"
+}
+export -f help
+
 # Displays version banner
 version()
 {
@@ -66,9 +79,26 @@ version()
     echo "Wine Message Compiler Version: $(${XTCDIR}/bin/wmc -V | grep 'version' | cut -d' ' -f5)"
     echo "Wine Resource Compiler Version: $(${XTCDIR}/bin/wrc --version | grep 'version' | cut -d' ' -f5)"
     echo
-    charch ${TARGET}
-    chbuild DEBUG
+    charch ${TARGET:-amd64}
+    chbuild ${BUILD_TYPE:-DEBUG}
     echo
     echo
 }
 export -f version
+
+# Builds application (wrapper to Ninja)
+xbuild()
+{
+	if [ ! -f build.arch ]; then
+		ninja "$@"
+	else
+		ARCH=$(cat build.arch)
+		if [ x"${ARCH}" != x"${TARGET}" ]; then
+			echo "Build is configured for '${ARCH}' while current target set to '${TARGET}'!"
+			echo "Cannot continue until conflict is resolved ..."
+			return 1
+		fi
+		ninja "$@"
+	fi
+}
+export -f xbuild
