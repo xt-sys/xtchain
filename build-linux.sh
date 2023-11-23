@@ -116,9 +116,8 @@ binutils_fetch()
 {
     if [ ! -d ${BINUTILSDIR} ]; then
         echo ">>> Downloading BINUTILS ..."
-        git clone ${BINUTILSVCS} ${BINUTILSDIR}
+        git clone --depth 1 --branch ${BINUTILSTAG} ${BINUTILSVCS} ${BINUTILSDIR}
         cd ${BINUTILSDIR}
-        git checkout tags/${BINUTILSTAG}
         apply_patches ${BINUTILSDIR##*/} ${BINUTILSTAG##*-}
         cd ${WRKDIR}
     fi
@@ -145,9 +144,8 @@ cmake_fetch()
 {
     if [ ! -d ${CMAKEDIR} ]; then
         echo ">>> Downloading CMAKE ..."
-        git clone ${CMAKEVCS} ${CMAKEDIR}
+        git clone --depth 1 --branch ${CMAKETAG} ${CMAKEVCS} ${CMAKEDIR}
         cd ${CMAKEDIR}
-        git checkout tags/${CMAKETAG}
         apply_patches ${CMAKEDIR##*/} ${CMAKETAG}
         cd ${WRKDIR}
     fi
@@ -282,9 +280,8 @@ llvm_fetch()
 {
     if [ ! -d ${LLVMDIR} ]; then
         echo ">>> Downloading LLVM ..."
-        git clone ${LLVMVCS} ${LLVMDIR}
+        git clone --depth 1 --branch ${LLVMTAG} ${LLVMVCS} ${LLVMDIR}
         cd ${LLVMDIR}
-        git checkout tags/${LLVMTAG}
         apply_patches ${LLVMDIR##*/} ${LLVMTAG##*-}
         cd ${WRKDIR}
     fi
@@ -319,9 +316,8 @@ make_fetch()
 {
     if [ ! -d ${MAKEDIR} ]; then
         echo ">>> Downloading Make ..."
-        git clone ${MAKEVCS} ${MAKEDIR}
+        git clone --depth 1 --branch ${MAKETAG} ${MAKEVCS} ${MAKEDIR}
         cd ${MAKEDIR}
-        git checkout tags/${MAKETAG}
         apply_patches ${MAKEDIR##*/} ${MAKETAG}
         cd ${WRKDIR}
     fi
@@ -440,11 +436,8 @@ mingw_fetch()
 {
     if [ ! -d ${MINGWDIR} ]; then
         echo ">>> Downloading MinGW-w64 ..."
-        git clone ${MINGWVCS} ${MINGWDIR}
+        git clone --depth 1 --branch ${MINGWTAG} ${MINGWVCS} ${MINGWDIR}
         cd ${MINGWDIR}
-        if [ x"${MINGWTAG}" != x"master" ]; then
-            git checkout tags/${MINGWTAG}
-        fi
         apply_patches ${MINGWDIR##*/} ${MINGWTAG}
         cd ${WRKDIR}
     fi
@@ -467,9 +460,8 @@ ninja_fetch()
 {
     if [ ! -d ${NINJADIR} ]; then
         echo ">>> Downloading NINJA ..."
-        git clone ${NINJAVCS} ${NINJADIR}
+        git clone --depth 1 --branch ${NINJATAG} ${NINJAVCS} ${NINJADIR}
         cd ${NINJADIR}
-        git checkout tags/${NINJATAG}
         apply_patches ${NINJADIR##*/} ${NINJATAG}
         cd ${WRKDIR}
     fi
@@ -502,9 +494,8 @@ wine_fetch()
 {
     if [ ! -d ${WINEDIR} ]; then
         echo ">>> Downloading WINE ..."
-        git clone ${WINEVCS} ${WINEDIR}
+        git clone --depth 1 --branch ${WINETAG} ${WINEVCS} ${WINEDIR}
         cd ${WINEDIR}
-        git checkout tags/${WINETAG}
         apply_patches ${WINEDIR##*/} ${WINETAG##*-}
         cd ${WRKDIR}
     fi
