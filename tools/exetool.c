@@ -138,7 +138,6 @@ int main(int argc, char *argv[])
 
     /* Read the current SubSystem value */
     fread(&SubSystem, sizeof(unsigned short), 1, ExeFile);
-    printf("Original SubSystem: 0x%04X <%s>\n", SubSystem, getSubSystemName(SubSystem));
 
     /* Parse the new SubSystem value from the command line argument */
     NewSubSystem = getSubSystem(argv[2]);
@@ -150,7 +149,6 @@ int main(int argc, char *argv[])
     }
 
     /* Print new SubSystem identifier */
-    printf("New SubSystem: 0x%04X <%s>\n", NewSubSystem->Identifier, NewSubSystem->Name);
 
     /* Seek back to the SubSystem field in the optional header */
     fseek(ExeFile, -sizeof(unsigned short), SEEK_CUR);
@@ -162,6 +160,7 @@ int main(int argc, char *argv[])
     fclose(ExeFile);
 
     /* Finished successfully */
-    printf("SubSystem successfully modified!\n");
+    printf("PE SubSystem modified: 0x%04X <%s> to 0x%04X <%s>\n",
+           SubSystem, getSubSystemName(SubSystem), NewSubSystem->Identifier, NewSubSystem->Name);
     return 0;
 }
