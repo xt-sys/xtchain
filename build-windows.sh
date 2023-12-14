@@ -593,9 +593,9 @@ xtchain_build()
     for ARCH in ${ARCHS}; do
         for EXEC in bin2c exetool xtcspecc; do
             if [ ! -e ${BINDIR}/bin/${EXEC} ]; then
-                x86_64-w64-mingw32-gcc ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}
+                x86_64-w64-mingw32-gcc ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}.exe
             fi
-            cp ${EXEC} ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}
+            cp ${EXEC}.exe ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}.exe
         done
     done
 }
