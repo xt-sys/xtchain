@@ -361,28 +361,6 @@ mingw_build_crt_OLD()
     cd ${WRKDIR}
 }
 
-# This function compiles and installs MINGW headers
-mingw_build_headers_OLD()
-{
-    echo ">>> Building Mingw-W64 (headers) ..."
-    [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
-    mkdir -p ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
-    cd ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
-    ../configure \
-        --prefix=${BINDIR}/${GENERIC} \
-        --enable-idl \
-        --with-default-msvcrt=${MINGWLIB} \
-        --with-default-win32-winnt=${MINGWNTV}
-    make -j${CORES}
-    make install
-    for ARCH in ${ARCHS}; do
-        mkdir -p ${BINDIR}/${ARCH}-w64-mingw32
-        if [ ! -e ${BINDIR}/${ARCH}-w64-mingw32/include ]; then
-            ln -sfn ../${GENERIC}/include ${BINDIR}/${ARCH}-w64-mingw32/include
-        fi
-    done
-    cd ${WRKDIR}
-}
 
 # This function compiles and install MINGW libraries
 mingw_build_libs_OLD()
@@ -586,6 +564,29 @@ llvm_build()
         cd ${WRKDIR}
 }
 
+# This function compiles and installs MINGW headers
+mingw_build_headers()
+{
+    echo ">>> Building Mingw-W64 (headers) ..."
+    [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
+    mkdir -p ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
+    cd ${MINGWDIR}/mingw-w64-headers/build-${GENERIC}
+    ../configure \
+        --prefix=${BINDIR}/${GENERIC} \
+        --enable-idl \
+        --with-default-msvcrt=${MINGWLIB} \
+        --with-default-win32-winnt=${MINGWNTV}
+    make -j${CORES}
+    make install
+    for ARCH in ${ARCHS}; do
+        mkdir -p ${BINDIR}/${ARCH}-w64-mingw32
+        if [ ! -e ${BINDIR}/${ARCH}-w64-mingw32/include ]; then
+            ln -sfn ../${GENERIC}/include ${BINDIR}/${ARCH}-w64-mingw32/include
+        fi
+    done
+    cd ${WRKDIR}
+}
+
 # This function compiles and installs XTCHAIN tools
 xtchain_build()
 {
@@ -627,13 +628,13 @@ llvm_fetch
 
 # Build and install LLVM
 llvm_build
-exit 1
 
 # Download Mingw-W64
 mingw_fetch
 
 # Build and install Mingw-W64 headers
 mingw_build_headers
+exit 1
 
 # Build and install Mingw-W64 CRT
 mingw_build_crt
