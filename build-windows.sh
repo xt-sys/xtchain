@@ -323,43 +323,6 @@ make_fetch()
     fi
 }
 
-# This function compiles and installs MINGW CRT
-mingw_build_crt_OLD()
-{
-    for ARCH in ${ARCHS}; do
-        echo ">>> Building Mingw-W64 (CRT) for ${ARCH} ..."
-        [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
-        mkdir -p ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
-        cd ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
-        case ${ARCH} in
-            "aarch64")
-                FLAGS="--disable-lib32 --disable-lib64 --enable-libarm64"
-                ;;
-            "armv7")
-                FLAGS="--disable-lib32 --disable-lib64 --enable-libarm32"
-                ;;
-            "i686")
-                FLAGS="--enable-lib32 --disable-lib64"
-                ;;
-            "x86_64")
-                FLAGS="--disable-lib32 --enable-lib64"
-                ;;
-        esac
-        ORIGPATH="${PATH}"
-        PATH="${BINDIR}/bin:${PATH}"
-        ../configure \
-            --host=${ARCH}-w64-mingw32 \
-            --prefix=${BINDIR}/${ARCH}-w64-mingw32 \
-            --with-sysroot=${BINDIR} \
-            --with-default-msvcrt=${MINGWLIB} \
-            --enable-cfguard \
-            ${FLAGS}
-        make -j${CORES}
-        make install
-        PATH="${ORIGPATH}"
-    done
-    cd ${WRKDIR}
-}
 
 
 # This function compiles and install MINGW libraries
@@ -564,6 +527,44 @@ llvm_build()
         cd ${WRKDIR}
 }
 
+# This function compiles and installs MINGW CRT
+mingw_build_crt()
+{
+    for ARCH in ${ARCHS}; do
+        echo ">>> Building Mingw-W64 (CRT) for ${ARCH} ..."
+        [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
+        mkdir -p ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
+        cd ${MINGWDIR}/mingw-w64-crt/build-${ARCH}
+        case ${ARCH} in
+            "aarch64")
+                FLAGS="--disable-lib32 --disable-lib64 --enable-libarm64"
+                ;;
+            "armv7")
+                FLAGS="--disable-lib32 --disable-lib64 --enable-libarm32"
+                ;;
+            "i686")
+                FLAGS="--enable-lib32 --disable-lib64"
+                ;;
+            "x86_64")
+                FLAGS="--disable-lib32 --enable-lib64"
+                ;;
+        esac
+        ORIGPATH="${PATH}"
+        PATH="${BINDIR}/bin:${PATH}"
+        ../configure \
+            --host=${ARCH}-w64-mingw32 \
+            --prefix=${BINDIR}/${ARCH}-w64-mingw32 \
+            --with-sysroot=${BINDIR} \
+            --with-default-msvcrt=${MINGWLIB} \
+            --enable-cfguard \
+            ${FLAGS}
+        make -j${CORES}
+        make install
+        PATH="${ORIGPATH}"
+    done
+    cd ${WRKDIR}
+}
+
 # This function compiles and installs MINGW headers
 mingw_build_headers()
 {
@@ -621,23 +622,23 @@ mkdir -p ${BINDIR}
 mkdir -p ${SRCDIR}
 
 # XTchain
-xtchain_build
+#xtchain_build
 
 # Download LLVM
-llvm_fetch
+#llvm_fetch
 
 # Build and install LLVM
-llvm_build
+#llvm_build
 
 # Download Mingw-W64
-mingw_fetch
+#mingw_fetch
 
 # Build and install Mingw-W64 headers
-mingw_build_headers
-exit 1
+#mingw_build_headers
 
 # Build and install Mingw-W64 CRT
 mingw_build_crt
+exit 1
 
 # Build and install LLVM compiler runtime
 llvm_build_runtime
