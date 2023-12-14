@@ -552,6 +552,7 @@ mingw_build_crt()
         ORIGPATH="${PATH}"
         PATH="${BINDIR}/bin:${PATH}"
         ../configure \
+            --disable-dependency-tracking \
             --host=${ARCH}-w64-mingw32 \
             --prefix=${BINDIR}/${ARCH}-w64-mingw32 \
             --with-sysroot=${BINDIR} \
