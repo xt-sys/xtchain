@@ -595,7 +595,7 @@ xtchain_build()
             if [ ! -e ${BINDIR}/bin/${EXEC} ]; then
                 x86_64-w64-mingw32-gcc ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}.exe
             fi
-            cp ${EXEC}.exe ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}.exe
+            cp ${BINDIR}/bin/${EXEC}.exe ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}.exe
         done
     done
 }
