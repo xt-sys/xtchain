@@ -592,7 +592,7 @@ xtchain_build()
     cp ${WRKDIR}/scripts/*-wrapper ${BINDIR}/${GENERIC}/bin
     for ARCH in ${ARCHS}; do
         for EXEC in bin2c exetool xtcspecc; do
-            if [ ! -e ${BINDIR}/bin/${EXEC} ]; then
+            if [ ! -e ${BINDIR}/bin/${EXEC}.exe ]; then
                 x86_64-w64-mingw32-gcc ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}.exe
             fi
             cp ${BINDIR}/bin/${EXEC}.exe ${BINDIR}/bin/${ARCH}-w64-mingw32-${EXEC}.exe
