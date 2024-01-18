@@ -2,7 +2,7 @@
  * PROJECT:     XTchain
  * LICENSE:     See COPYING.md in the top level directory
  * FILE:        tools/exetool.c
- * DESCRIPTION: Portable Executable (PE) utility for changing subsystem
+ * DESCRIPTION: Portable Executable (PE) utility for changing its signature and subsystem
  * DEVELOPERS:  Rafal Kupiec <belliash@codingworkshop.eu.org>
  */
 
@@ -91,6 +91,7 @@ int main(int argc, char *argv[])
     FILE *ExeFile;
     unsigned char Signature[4];
     unsigned int HeaderOffset;
+    unsigned int ImageSignature;
     unsigned short SubSystem;
     PPE_SUBSYSTEM NewSubSystem;
 
@@ -101,44 +102,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* Open the EXE file in binary mode */
-    ExeFile = fopen(argv[1], "r+b");
-    if(ExeFile == NULL)
-    {
-        /* Failed to open PE file */
-        printf("ERROR: Unable to open file %s\n", argv[1]);
-        return 1;
-    }
-    
-    /* Verify that the input file has a valid DOS header */
-    fread(Signature, sizeof(unsigned char), 4, ExeFile);
-    if(Signature[0] != 'M' || Signature[1] != 'Z')
-    {
-        /* Invalid DOS header */
-        printf("ERROR: %s is not a valid EXE file\n", argv[1]);
-        fclose(ExeFile);
-        return 1;
-    }
-
-    /* Verify that the input file has a valid PE header */
-    fseek(ExeFile, 0x3C, SEEK_SET);
-    fread(&HeaderOffset, sizeof(unsigned int), 1, ExeFile);
-    fseek(ExeFile, HeaderOffset, SEEK_SET);
-    fread(Signature, sizeof(unsigned char), 4, ExeFile);
-    if(Signature[0] != 'P' || Signature[1] != 'E' || Signature[2] != 0 || Signature[3] != 0)
-    {
-        /* Invalid PE header */
-        printf("Error: %s is not a valid PE file\n", argv[1]);
-        fclose(ExeFile);
-        return 1;
-    }
-
-    /* Seek to the offset of the SubSystem field in the optional header */
-    fseek(ExeFile, HeaderOffset + 0x5C, SEEK_SET);
-
-    /* Read the current SubSystem value */
-    fread(&SubSystem, sizeof(unsigned short), 1, ExeFile);
-
     /* Parse the new SubSystem value from the command line argument */
     NewSubSystem = getSubSystem(argv[2]);
     if(NewSubSystem->Identifier == 0)
@@ -148,7 +111,60 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* Print new SubSystem identifier */
+    /* Open the EXE file in binary mode */
+    ExeFile = fopen(argv[1], "r+b");
+    if(ExeFile == NULL)
+    {
+        /* Failed to open PE file */
+        printf("ERROR: Unable to open file %s\n", argv[1]);
+        return 2;
+    }
+    
+    /* Verify that the input file has a valid DOS header */
+    fread(Signature, sizeof(unsigned char), 4, ExeFile);
+    if(Signature[0] != 'M' || Signature[1] != 'Z')
+    {
+        /* Invalid DOS header */
+        printf("ERROR: %s is not a valid EXE file\n", argv[1]);
+        fclose(ExeFile);
+        return 3;
+    }
+
+    /* Verify that the input file has a valid PE header */
+    fseek(ExeFile, 0x3C, SEEK_SET);
+    fread(&HeaderOffset, sizeof(unsigned int), 1, ExeFile);
+    fseek(ExeFile, HeaderOffset, SEEK_SET);
+    fread(Signature, sizeof(unsigned char), 4, ExeFile);
+    if((Signature[0] != 'P' || Signature[1] != 'E' || Signature[2] != 0 || Signature[3] != 0) &&
+       (Signature[0] != 'P' || Signature[1] != 'E' || Signature[2] != 'X' || Signature[3] != 'T'))
+    {
+        /* Invalid PE header */
+        printf("Error: %s is not a valid PE file\n", argv[1]);
+        fclose(ExeFile);
+        return 3;
+    }
+
+    /* Check if setting XT subsystem */
+    if(NewSubSystem->Identifier >= 0x14 && NewSubSystem->Identifier <= 0x19)
+    {
+        /* Write PEXT signature */
+        ImageSignature = 0x54584550;
+    }
+    else
+    {
+        /* Write PE00 signature */
+        ImageSignature = 0x00004550;
+    }
+
+    /* Seek back to header offset and write new signature */
+    fseek(ExeFile, HeaderOffset, SEEK_SET);
+    fwrite(&ImageSignature, sizeof(ImageSignature), 1, ExeFile);
+
+    /* Seek to the offset of the SubSystem field in the optional header */
+    fseek(ExeFile, HeaderOffset + 0x5C, SEEK_SET);
+
+    /* Read the current SubSystem value */
+    fread(&SubSystem, sizeof(unsigned short), 1, ExeFile);
 
     /* Seek back to the SubSystem field in the optional header */
     fseek(ExeFile, -sizeof(unsigned short), SEEK_CUR);
@@ -160,7 +176,7 @@ int main(int argc, char *argv[])
     fclose(ExeFile);
 
     /* Finished successfully */
-    printf("PE SubSystem modified: 0x%04X <%s> to 0x%04X <%s>\n",
+    printf("PE SubSystem modified: 0x%02X <%s> to 0x%02X <%s>\n",
            SubSystem, getSubSystemName(SubSystem), NewSubSystem->Identifier, NewSubSystem->Name);
     return 0;
 }
