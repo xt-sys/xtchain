@@ -28,7 +28,7 @@ CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-18.1.0"
+LLVMTAG="llvmorg-18.1.1"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Make Settings
