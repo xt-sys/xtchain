@@ -16,19 +16,14 @@ WRKDIR="$(pwd)"
 ARCHS="aarch64 armv7 i686 x86_64"
 GENERIC="generic-w64-mingw32"
 
-# Binutils Settings
-BINUTILSDIR="${SRCDIR}/binutils"
-BINUTILSTAG="binutils-2_41"
-BINUTILSVCS="git://sourceware.org/git/binutils-gdb.git"
-
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
-CMAKETAG="v3.27.6"
+CMAKETAG="v3.29.3"
 CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-18.1.4"
+LLVMTAG="llvmorg-18.1.5"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Make Settings
@@ -45,12 +40,12 @@ MINGWVCS="https://github.com/mirror/mingw-w64.git"
 
 # Ninja Settings
 NINJADIR="${SRCDIR}/ninja"
-NINJATAG="v1.11.1"
+NINJATAG="v1.12.1"
 NINJAVCS="https://github.com/ninja-build/ninja.git"
 
 # Wine Settings
 WINEDIR="${SRCDIR}/wine"
-WINETAG="wine-8.17"
+WINETAG="wine-9.8"
 WINEVCS="git://source.winehq.org/git/wine.git"
 
 
@@ -76,50 +71,6 @@ apply_patches()
                 done
             fi
         done
-    fi
-}
-
-# This function compiles and installs GNU BINUTILS
-binutils_build()
-{
-    echo ">>> Building BINUTILS ..."
-    for ARCH in ${ARCHS}; do
-        [ -z ${CLEAN} ] || rm -rf ${BINUTILSDIR}/build-${ARCH}
-        mkdir -p ${BINUTILSDIR}/build-${ARCH}
-        cd ${BINUTILSDIR}/build-${ARCH}
-        case ${ARCH} in
-            "armv7")
-                TARGET="arm"
-                ;;
-            *)
-                TARGET="${ARCH}"
-                ;;
-        esac
-        ../configure \
-            --target=${TARGET}-w64-mingw32 \
-            --disable-binutils \
-            --disable-gdb \
-            --disable-gprof \
-            --disable-ld \
-            --disable-multilib \
-            --disable-nls \
-            --disable-werror \
-            --with-zlib=yes
-        make -j${CORES}
-        cp ${BINUTILSDIR}/build-${ARCH}/gas/as-new ${BINDIR}/bin/${ARCH}-w64-mingw32-gas
-    done
-    cd ${WRKDIR}
-}
-
-# This function downloads GNU BINUTILS from VCS
-binutils_fetch()
-{
-    if [ ! -d ${BINUTILSDIR} ]; then
-        echo ">>> Downloading BINUTILS ..."
-        git clone --depth 1 --branch ${BINUTILSTAG} ${BINUTILSVCS} ${BINUTILSDIR}
-        cd ${BINUTILSDIR}
-        apply_patches ${BINUTILSDIR##*/} ${BINUTILSTAG##*-}
-        cd ${WRKDIR}
     fi
 }
 
@@ -574,12 +525,6 @@ mingw_build_libs
 
 # Build and install Mingw-W64 tools
 mingw_build_tools
-
-# Download Binutils
-binutils_fetch
-
-# Build and install Binutils
-binutils_build
 
 # Download Wine
 wine_fetch
