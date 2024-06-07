@@ -169,9 +169,9 @@ void check_num_args(int arg,
 int main(int argc,
          char* argv[])
 {
-    const char *dir;
-    const char *basename;
-    const char *target;
+    char *dir;
+    char *basename;
+    char *target;
 
     split_argv(argv[0], &dir, &basename, &target, NULL);
 
