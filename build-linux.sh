@@ -46,7 +46,7 @@ NINJAVCS="https://github.com/ninja-build/ninja.git"
 # Wine Settings
 WINEDIR="${SRCDIR}/wine"
 WINETAG="wine-9.8"
-WINEVCS="git://source.winehq.org/git/wine.git"
+WINEVCS="https://github.com/wine-mirror/wine.git"
 
 
 # This function applies a patches to the 3rd party project
