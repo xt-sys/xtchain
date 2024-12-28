@@ -18,7 +18,7 @@ GENERIC="generic-w64-mingw32"
 
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
-CMAKETAG="v3.29.3"
+CMAKETAG="v3.31.3"
 CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
@@ -363,7 +363,7 @@ mingw_build_libs()
 # This function compiles and installs MINGW tools
 mingw_build_tools()
 {
-    for TOOL in gendef genidl genlib genpeimg widl; do
+    for TOOL in gendef genidl genpeimg widl; do
         for ARCH in ${ARCHS}; do
             echo ">>> Building Mingw-w64 (tools) for ${ARCH} ..."
             [ -z ${CLEAN} ] || rm -rf ${MINGWDIR}/mingw-w64-tools/${TOOL}/build-${ARCH}
