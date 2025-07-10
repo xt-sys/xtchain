@@ -7,56 +7,12 @@
  *              Rafal Kupiec <belliash@codingworkshop.eu.org>
  */
 
-#ifdef UNICODE
-#define _UNICODE
-#endif
-
-#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #define _T(x) x
-
-#ifdef _UNICODE
-#define TS "%ls"
-#else
-#define TS "%s"
-#endif
-
-static
-inline
-int
-_tcsicmp(const char *a,
-         const char *b)
-{
-    while(*a && tolower(*a) == tolower(*b))
-    {
-        a++;
-        b++;
-    }
-
-    return *a - *b;
-}
-
-static
-inline
-char *
-concat(const char *prefix,
-       const char *suffix)
-{
-    int prefixlen = strlen(prefix);
-    int suffixlen = strlen(suffix);
-
-    char *buf = malloc((prefixlen + suffixlen + 1) * sizeof(*buf));
-
-    strcpy(buf, prefix);
-    strcpy(buf + prefixlen, suffix);
-
-    return buf;
-}
 
 static
 inline
@@ -147,16 +103,4 @@ split_argv(const char *argv0,
     {
         *exe_ptr = exe;
     }
-}
-
-static
-inline
-int
-run_final(const char *executable,
-          const char *const *argv)
-{
-    execvp(executable, (char **) argv);
-    perror(executable);
-
-    return 1;
 }

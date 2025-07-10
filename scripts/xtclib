@@ -4,7 +4,19 @@
 # FILE:        scripts/xtclib
 # DESCRIPTION: XTchain library
 # DEVELOPERS:  Rafal Kupiec <belliash@codingworkshop.eu.org>
+#              Aiken Harris <harraiken91@gmail.com>
 
+
+# Prints XTChain banner
+banner()
+{
+    local XTC_BANNER="XT Toolchain v${XTCVER} for Linux"
+
+    printf "###############################################################################\n\n"
+    printf "%*s\n\n" $(( (${#XTC_BANNER} + 80) / 2)) "${XTC_BANNER}"
+    printf "###############################################################################\n\n\n"
+}
+export -f banner
 
 # Sets the target architecture
 charch()
@@ -54,51 +66,67 @@ export -f chbuild
 # Prints help
 help()
 {
-	version
-	echo "XTChain defines an internal list of commands:"
-	echo " * charch [arch]   - sets the target CPU architecture [aarch64/armv7/i686/amd64]"
-	echo " * chbuild [type]  - sets build type [debug/release]"
-	echo " * help            - prints this message"
-	echo " * version         - prints XTChain and its components version"
-	echo " * xbuild          - builds an application with a Ninja build system"
+    banner
+    echo "XTChain defines an internal list of commands:"
+    echo " * banner          - prints XTChain banner"
+    echo " * charch [arch]   - sets the target CPU architecture [aarch64/armv7/i686/amd64]"
+    echo " * chbuild [type]  - sets build type [debug/release]"
+    echo " * help            - prints this message"
+    echo " * version         - prints XTChain and its components version"
+    echo " * xbuild          - builds an application with a Ninja build system"
 }
 export -f help
 
 # Displays version banner
 version()
 {
-    echo "###############################################################################"
-    echo "#                        XT Toolchain v${XTCVER} for Linux                        #"
-    echo "#               by Rafal Kupiec <belliash@codingworkshop.eu.org>              #"
-    echo "###############################################################################"
-    echo
-    echo
-    echo "LLVM Compiler Version: $(${XTCDIR}/bin/clang --version | grep 'clang version' | cut -d' ' -f3)"
-    echo "LLVM Windres Utility Version: $(${XTCDIR}/bin/i686-w64-mingw32-windres -V | cut -d' ' -f6)"
-    echo "Mingw IDL Compiler Version: $(${XTCDIR}/bin/i686-w64-mingw32-widl -V | grep 'version' | cut -d' ' -f5)"
-    echo "Wine Message Compiler Version: $(${XTCDIR}/bin/wmc -V | grep 'version' | cut -d' ' -f5)"
-    echo "Wine Resource Compiler Version: $(${XTCDIR}/bin/wrc --version | grep 'version' | cut -d' ' -f5)"
-    echo
+    local XTCHAIN_EXTTOOLS=false
+
+    if [ ! -f ${XTCDIR}/bin/clang ] || [ "$(which clang)" != "${XTCDIR}/bin/clang" ] || [ $(echo ${XTCVER} | grep "min") ]; then
+        XTCHAIN_EXTTOOLS=true
+        for TOOL in {clang,clang++,cmake,lld-link,ninja}; do
+            which ${TOOL} &> /dev/null
+            if [ $? -ne 0 ]; then
+                echo "ERROR: You are using minimal version of XTChain and '${TOOL}' has been not found in your system!"
+                echo "ERROR: Please install all required tools."
+                exit 1
+            fi
+        done
+    fi
+
+    banner
+    echo -en "\nLLVM/Clang Compiler: $(clang --version | grep 'clang version' | cut -d' ' -f3) ($(which clang))"
+    echo -en "\nLLVM/LLD Linker: $(lld-link --version | cut -d' ' -f2) ($(which lld-link))"
+    echo -en "\nLLVM Resource Compiler: $(windres --version | grep version | cut -d' ' -f5) ($(which windres))"
+    echo -en "\nWine IDL Compiler: $(widl -V | grep 'version' | cut -d' ' -f5) ($(which widl))"
+    echo -en "\nWine Message Compiler: $(wmc -V | grep 'version' | cut -d' ' -f5) ($(which wmc))"
+    echo -en "\nWine Resource Compiler: $(wrc --version | grep 'version' | cut -d' ' -f5) ($(which wrc))"
+    echo -en "\nXT SPEC Compiler: $(xtcspecc --help | grep Version | cut -d' ' -f5) ($(which xtcspecc))"
+    echo -en "\nCMake Build System: $(cmake --version | grep 'cmake version' | cut -d' ' -f3) ($(which cmake))"
+    echo -en "\nNinja Build System: $(ninja --version) ($(which ninja))"
+    echo -en "\n\n"
+
     charch ${TARGET:-amd64}
     chbuild ${BUILD_TYPE:-DEBUG}
-    echo
-    echo
+
+    echo -en "\n\nFor a list of all supported commands, type 'help'"
+    echo -en "\n-------------------------------------------------\n\n"
 }
 export -f version
 
 # Builds application (wrapper to Ninja)
 xbuild()
 {
-	if [ ! -f build.arch ]; then
-		ninja "$@"
-	else
-		ARCH=$(cat build.arch)
-		if [ x"${ARCH}" != x"${TARGET}" ]; then
-			echo "Build is configured for '${ARCH}' while current target set to '${TARGET}'!"
-			echo "Cannot continue until conflict is resolved ..."
-			return 1
-		fi
-		ninja "$@"
-	fi
+        if [ ! -f build.arch ]; then
+                ninja "$@"
+        else
+                ARCH=$(cat build.arch)
+                if [ x"${ARCH}" != x"${TARGET}" ]; then
+                        echo "Build is configured for '${ARCH}' while current target set to '${TARGET}'!"
+                        echo "Cannot continue until conflict is resolved ..."
+                        return 1
+                fi
+                ninja "$@"
+        fi
 }
 export -f xbuild

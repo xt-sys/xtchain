@@ -3,18 +3,27 @@ run-name: ${{ github.actor }} runs Gitea Actions
 on: [push]
 
 jobs:
-  XTChain:
+  XTchain:
+    strategy:
+      matrix:
+        target: [linux, windows]
+        build: [full, minimal]
     runs-on: oscw
     container:
       image: codingworkshop/oscw-runner:latest
     steps:
       - name: Clone repository
         uses: actions/checkout@v3
-      - name: Build XTChain
-        run: CORES=10 ./build-linux.sh
+      - name: Build XTchain
+        run: |
+          if [ "${{ matrix.build }}" == "minimal" ]; then
+            ./build.sh --jobs=10 --target=${{ matrix.target }} --minimal
+          else
+            ./build.sh --jobs=10 --target=${{ matrix.target }}
+          fi
       - name: Publish binaries
         if: startsWith(github.ref, 'refs/tags/')
         env:
           OSCW_GITHUB_USERNAME: ${{ secrets.OSCW_GITHUB_USERNAME }}
           OSCW_GITHUB_PASSWORD: ${{ secrets.OSCW_GITHUB_PASSWORD }}
-        run: github_publish $OSCW_GITHUB_USERNAME $OSCW_GITHUB_PASSWORD $(ls xtchain-*-linux.tar.zst)
+        run: github_publish $OSCW_GITHUB_USERNAME $OSCW_GITHUB_PASSWORD $(ls xtchain-*-${{ matrix.target }}.*)
