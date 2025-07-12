@@ -97,7 +97,6 @@ version()
     banner
     echo -en "\nLLVM/Clang Compiler: $(clang --version | grep 'clang version' | cut -d' ' -f3) ($(which clang))"
     echo -en "\nLLVM/LLD Linker: $(lld-link --version | cut -d' ' -f2) ($(which lld-link))"
-    echo -en "\nLLVM Resource Compiler: $(windres --version | grep version | cut -d' ' -f5) ($(which windres))"
     echo -en "\nWine IDL Compiler: $(widl -V | grep 'version' | cut -d' ' -f5) ($(which widl))"
     echo -en "\nWine Message Compiler: $(wmc -V | grep 'version' | cut -d' ' -f5) ($(which wmc))"
     echo -en "\nWine Resource Compiler: $(wrc --version | grep 'version' | cut -d' ' -f5) ($(which wrc))"
