@@ -130,10 +130,6 @@ function version {
 
 # Builds application (wrapper to Ninja)
 function xbuild {
-    param(
-        [string[]]$args
-    )
-
     if (-not (Test-Path build.arch)) {
         & ninja @args
     } else {
