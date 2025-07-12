@@ -105,7 +105,6 @@ function version {
     Write-Host
     Write-Host "LLVM/Clang Compiler: $(clang --version | Select-String -Pattern "version (\d+\.\d+\.\d+)"  | ForEach-Object { $_.Matches.Groups[1].Value }) ($($(Get-Command clang).Source))"
     Write-Host "LLVM/LLD Linker: $(lld-link --version |  Select-String -Pattern "(\d+\.\d+\.\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }) ($($(Get-Command lld-link).Source))"
-    Write-Host "LLVM Resource Compiler: $(windres --version | Select-String -Pattern "version (\d+\.\d+\.\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }) ($($(Get-Command windres).Source))"
     Write-Host "Wine IDL Compiler: $(widl -V | Select-String -Pattern "version (\d+\.\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }) ($($(Get-Command widl).Source))"
     Write-Host "Wine Message Compiler: $(wmc -V | Select-String -Pattern "version (\d+\.\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }) ($($(Get-Command wmc).Source))"
     Write-Host "Wine Resource Compiler: $(wrc --version | Select-String -Pattern "version (\d+\.\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }) ($($(Get-Command wrc).Source))"
