@@ -7,13 +7,13 @@
 
 
 # Get the absolute path to the XTchain
-export XTCDIR="$(realpath $(dirname ${0}))"
+export XTCDIR="$(realpath $(dirname "${0}"))"
 
 # Read the XTchain version
-export XTCVER="$(cat ${XTCDIR}/Version)"
+export XTCVER="$(cat "${XTCDIR}/Version")"
 
 # Load the library
-source ${XTCDIR}/lib/xtchain/xtclib
+source "${XTCDIR}/lib/xtchain/xtclib"
 
 # Set the target architecture
 : ${TARGET:=${1}}
@@ -41,4 +41,4 @@ export PFMAT3="\[\033[0;1;97;104m\]"
 export PFMAT4="\[\033[0;94;49m\]"
 export PFMAT5="\[\033[1;38;5;74m\]"
 export PROMPT="\n${PFMAT1} XT Toolchain ${PFMAT2}${PFMAT3} \w ${PFMAT4}${PFMAT5} "
-bash --rcfile <(echo 'source ~/.bashrc && export PS1="${PROMPT}" && cd ${SRCDIR}')
+bash --rcfile <(echo 'export PS1="${PROMPT}" && cd "${SRCDIR}"')
