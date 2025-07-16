@@ -36,7 +36,7 @@ LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Ninja Settings
 NINJADIR="${SRCDIR}/ninja"
-NINJATAG="v1.13.0"
+NINJATAG="v1.13.1"
 NINJAVCS="https://github.com/ninja-build/ninja.git"
 
 # Wine Settings
