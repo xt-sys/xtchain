@@ -13,8 +13,8 @@ banner()
     local XTC_BANNER="XT Toolchain v${XTCVER} for Linux"
 
     printf "###############################################################################\n\n"
-    printf "%*s\n\n" $(( (${#XTC_BANNER} + 80) / 2)) "${XTC_BANNER}"
-    printf "###############################################################################\n\n\n"
+    printf "\033[33m%*s\033[00m\n\n" $(( (${#XTC_BANNER} + 80) / 2)) "${XTC_BANNER}"
+    printf "###############################################################################\n\n"
 }
 export -f banner
 
@@ -82,7 +82,7 @@ version()
 {
     local XTCHAIN_EXTTOOLS=false
 
-    if [ ! -f ${XTCDIR}/bin/clang ] || [ "$(which clang)" != "${XTCDIR}/bin/clang" ] || [ $(echo ${XTCVER} | grep "min") ]; then
+    if [ ! -f "${XTCDIR}/bin/clang" ] || [ "$(which clang)" != "${XTCDIR}/bin/clang" ] || [ $(echo ${XTCVER} | grep "min") ]; then
         XTCHAIN_EXTTOOLS=true
         for TOOL in {clang,clang++,cmake,lld-link,ninja}; do
             which ${TOOL} &> /dev/null
@@ -109,7 +109,7 @@ version()
     chbuild ${BUILD_TYPE:-DEBUG}
 
     echo -en "\n\nFor a list of all supported commands, type 'help'"
-    echo -en "\n-------------------------------------------------\n\n"
+    echo -en "\n-------------------------------------------------\n\n\n"
 }
 export -f version
 
