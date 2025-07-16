@@ -352,11 +352,9 @@ xtchain_build()
     case "${SYSTEM_NAME}" in
         Windows)
             CCOMPILER="${SYSTEM_HOST}-gcc"
-            EXTENSION=".ps1"
             ;;
         *)
             CCOMPILER="clang"
-            EXTENSION=""
     esac
 
     # Build XTchain tools
@@ -368,8 +366,8 @@ xtchain_build()
             ${CCOMPILER} ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}
         fi
     done
-    cp ${WRKDIR}/scripts/xtclib${EXTENSION} ${BINDIR}/lib/xtchain/
-    cp ${WRKDIR}/scripts/xtchain${EXTENSION} ${BINDIR}/
+    cp ${WRKDIR}/scripts/xtclib* ${BINDIR}/lib/xtchain/
+    cp ${WRKDIR}/scripts/xtchain* ${BINDIR}/
 }
 
 # This function generates XTCHAIN version file and produces tarball archive
