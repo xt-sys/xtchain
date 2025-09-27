@@ -31,8 +31,13 @@ CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-21.1.1"
+LLVMTAG="llvmorg-21.1.2"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
+
+# Mtools Settings
+MTOOLSDIR="${SRCDIR}/mtools"
+MTOOLSTAG="v4.0.49"
+MTOOLSVCS="https://github.com/xt-sys/mtools.git"
 
 # Ninja Settings
 NINJADIR="${SRCDIR}/ninja"
@@ -203,6 +208,48 @@ llvm_fetch()
         git clone --depth 1 --branch ${LLVMTAG} ${LLVMVCS} ${LLVMDIR}
         cd ${LLVMDIR}
         apply_patches ${LLVMDIR##*/} ${LLVMTAG##*-}
+        cd ${WRKDIR}
+    fi
+}
+
+# This function compiles and installs MTOOLS
+mtools_build()
+{
+    local CONFIGURE_PARAMETERS=""
+    local EXTENSION=""
+
+    # Clean old build if necessary
+    [ "${CLEAN_BUILD}" -eq 1 ] && rm -rf ${MTOOLSDIR}/build-${SYSTEM_NAME}
+
+    # Additional, target-specific configuration options
+    case "${SYSTEM_NAME}" in
+        Windows)
+            CONFIGURE_PARAMETERS="${CONFIGURE_PARAMETERS} --host=${SYSTEM_HOST}"
+            EXTENSION=".exe"
+            ;;
+    esac
+
+    # Build Mtools
+    echo ">>> Building MTOOLS ..."
+    mkdir -p ${MTOOLSDIR}/build-${SYSTEM_NAME}
+    cd ${MTOOLSDIR}/build-${SYSTEM_NAME}
+    ../configure ${CONFIGURE_PARAMETERS}
+    make -j ${BUILD_JOBS}
+    cp mtools${EXTENSION} ${BINDIR}/bin/
+    for TOOL in mcat mcd mcopy mdel mdir mformat minfo mlabel mmd mmove mpartition mrd mren mshowfat mtype mzip; do
+        cp mtools${EXTENSION} ${BINDIR}/bin/${TOOL}${EXTENSION}
+    done
+    cd ${WRKDIR}
+}
+
+# This function downloads MTOOLS from VCS
+mtools_fetch()
+{
+    if [ ! -d ${MTOOLSDIR} ]; then
+        echo ">>> Downloading MTOOLS ..."
+        git clone --depth 1 --branch ${MTOOLSTAG} ${MTOOLSVCS} ${MTOOLSDIR}
+        cd ${MTOOLSDIR}
+        apply_patches ${MTOOLSDIR##*/} ${MTOOLSTAG}
         cd ${WRKDIR}
     fi
 }
@@ -478,6 +525,10 @@ xtchain_build
 # Download and build Wine tools
 wine_fetch
 wine_build
+
+# Download and build GNU Mtools
+mtools_fetch
+mtools_build
 
 if [ ${BUILD_MINIMAL} -eq 0 ]; then
     # Download and build LLVM
