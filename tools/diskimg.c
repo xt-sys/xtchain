@@ -54,6 +54,8 @@ int LoadSector(const char *FileName, uint8_t *Buffer)
 int main(int argc, char **argv)
 {
     FILE *File;
+    char FormatCommand[512];
+    long FormatPartition = 0;
     long DiskSizeBytes = 0;
     long DiskSizeMB = 0;
     MBR_PARTITION Partition = {0};
@@ -67,20 +69,25 @@ int main(int argc, char **argv)
     /* Parse command line arguments */
     for(int i = 1; i < argc; i++)
     {
-        if(strcmp(argv[i], "-s") == 0 && i + 1 < argc)
+        if(strcmp(argv[i], "-f") == 0 && i + 1 < argc)
         {
-            /* Disk size */
-            DiskSizeMB = atol(argv[++i]);
+            /* Format partition */
+            FormatPartition = 1;
+        }
+        else if(strcmp(argv[i], "-m") == 0 && i + 1 < argc)
+        {
+            /* MBR file */
+            MbrFile = argv[++i];
         }
         else if(strcmp(argv[i], "-o") == 0 && i + 1 < argc)
         {
             /* Output file */
             FileName = argv[++i];
         }
-        else if(strcmp(argv[i], "-m") == 0 && i + 1 < argc)
+        else if(strcmp(argv[i], "-s") == 0 && i + 1 < argc)
         {
-            /* MBR file */
-            MbrFile = argv[++i];
+            /* Disk size */
+            DiskSizeMB = atol(argv[++i]);
         }
         else if(strcmp(argv[i], "-v") == 0 && i + 1 < argc)
         {
@@ -156,6 +163,30 @@ int main(int argc, char **argv)
         perror("Failed to write MBR to disk image");
         fclose(File);
         return 1;
+    }
+
+    /* Check if we need to format the partition */
+    if(FormatPartition)
+    {
+        /* Close file before calling external formatter */
+        fclose(File);
+
+        /* Build mformat command */
+        snprintf(FormatCommand, sizeof(FormatCommand), "mformat -i %s@@%ld -h32 -t32 -n64 -L32", FileName, (long)(Partition.StartLBA * SECTOR_SIZE));
+        if(system(FormatCommand) != 0)
+        {
+            /* Failed to format partition */
+            perror("Failed to format partition");
+            return 1;
+        }
+
+        /* Reopen disk image */
+        File = fopen(FileName, "r+b");
+        if(!File) {
+            /* Failed to open file */
+            perror("Failed to reopen disk image");
+            return 1;
+        }
     }
 
     /* Write VBR to the start of the partition, if provided */
