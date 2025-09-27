@@ -54,6 +54,7 @@ int LoadSector(const char *FileName, uint8_t *Buffer)
 int main(int argc, char **argv)
 {
     FILE *File;
+    long FatFormat = 32;
     char FormatCommand[512];
     long FormatPartition = 0;
     long DiskSizeBytes = 0;
@@ -73,6 +74,12 @@ int main(int argc, char **argv)
         {
             /* Format partition */
             FormatPartition = 1;
+            FatFormat = atoi(argv[++i]);
+            if(FatFormat != 16 && FatFormat != 32)
+            {
+                fprintf(stderr, "Error: FAT format (-f) must be 16 or 32\n");
+                return 1;
+            }
         }
         else if(strcmp(argv[i], "-m") == 0 && i + 1 < argc)
         {
@@ -106,7 +113,7 @@ int main(int argc, char **argv)
     if(DiskSizeMB <= 0 || FileName == NULL)
     {
         /* Missing required arguments, print usage */
-        fprintf(stderr, "Usage: %s -s <size_MB> -o <output.img> [-m <mbr.img>] [-v <vbr.img>]\n", argv[0]);
+        fprintf(stderr, "Usage: %s -s <size_MB> -o <output.img> [-f 16|32] [-m <mbr.img>] [-v <vbr.img>]\n", argv[0]);
         return 1;
     }
 
@@ -145,9 +152,9 @@ int main(int argc, char **argv)
         }
     }
 
-    /* Setup MBR partition as W95 FAT32 */
+    /* Setup MBR partition as W95 FAT16 or FAT32 */
     Partition.BootFlag = 0x80;
-    Partition.Type = 0x0B;
+    Partition.Type = (FatFormat == 16) ? 0x06 : 0x0B;
     Partition.StartLBA = 2048;
     Partition.Size = (DiskSizeBytes / SECTOR_SIZE) - 2048;
 
@@ -172,7 +179,21 @@ int main(int argc, char **argv)
         fclose(File);
 
         /* Build mformat command */
-        snprintf(FormatCommand, sizeof(FormatCommand), "mformat -i %s@@%ld -h32 -t32 -n64 -L32", FileName, (long)(Partition.StartLBA * SECTOR_SIZE));
+        if(FatFormat == 16)
+        {
+            /* Format partition as FAT16 */
+            snprintf(FormatCommand, sizeof(FormatCommand),
+                     "mformat -i %s@@%ld",
+                     FileName, (long)(Partition.StartLBA * SECTOR_SIZE));
+        }
+        else
+        {
+            /* Format partition as FAT32 */
+            snprintf(FormatCommand, sizeof(FormatCommand),
+                     "mformat -i %s@@%ld -F",
+                     FileName, (long)(Partition.StartLBA * SECTOR_SIZE));
+        }
+
         if(system(FormatCommand) != 0)
         {
             /* Failed to format partition */
@@ -208,10 +229,11 @@ int main(int argc, char **argv)
     }
 
     fclose(File);
-    printf("Successfully created disk image '%s' (%ld MB) with one bootable W95 FAT32 partition%s%s.\n",
+    printf("Successfully created disk image '%s' (%ld MB) with bootable W95 FAT-%ld partition%s%s.\n",
            FileName,
            DiskSizeMB,
-           MbrFile ? " with MBR from file" : "",
-           VbrFile ? " and VBR from file" : "");
+           FatFormat,
+           MbrFile ? ", MBR written" : "",
+           VbrFile ? ", VBR written" : "");
     return 0;
 }
