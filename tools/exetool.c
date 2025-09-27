@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
     fread(&SubSystem, sizeof(unsigned short), 1, ExeFile);
 
     /* Seek back to the SubSystem field in the optional header */
-    fseek(ExeFile, -sizeof(unsigned short), SEEK_CUR);
+    fseek(ExeFile, -(long)sizeof(unsigned short), SEEK_CUR);
 
     /* Write the new SubSystem value */
     fwrite(&NewSubSystem->Identifier, sizeof(unsigned short), 1, ExeFile);
