@@ -9,10 +9,22 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define _T(x) x
+
+#define SECTOR_SIZE     512
+#define _T(x)           x
+
+typedef struct MBR_PARTITION {
+    uint8_t BootFlag;       // 0x80 = bootable, 0x00 = non-boot
+    uint8_t StartCHS [3];   // CHS address
+    uint8_t Type;           // Partition type
+    uint8_t EndCHS[3];      // CHS address
+    uint32_t StartLBA;      // Start sector
+    uint32_t Size;          // Sectors count
+} MBR_PARTITION, *PMBR_PARTITION;
 
 static
 inline
@@ -52,17 +64,17 @@ split_argv(const char *argv0,
            char **exe_ptr)
 {
     const char *sep = _tcsrchrs(argv0, '/', '\\');
+    const char *basename_ptr_const = argv0;
     char *dir = strdup(_T(""));
-    const char *basename = argv0;
 
     if(sep)
     {
         dir = strdup(argv0);
         dir[sep + 1 - argv0] = '\0';
-        basename = sep + 1;
+        basename_ptr_const = sep + 1;
     }
 
-    basename = strdup(basename);
+    char *basename = strdup(basename_ptr_const);
     char *period = strchr(basename, '.');
 
     if(period)
@@ -72,7 +84,7 @@ split_argv(const char *argv0,
 
     char *target = strdup(basename);
     char *dash = strrchr(target, '-');
-    const char *exe = basename;
+    char *exe = basename;
 
     if(dash)
     {

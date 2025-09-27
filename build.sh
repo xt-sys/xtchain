@@ -408,7 +408,7 @@ xtchain_build()
     echo ">>> Building XTchain tools ..."
     mkdir -p ${BINDIR}/bin
     mkdir -p ${BINDIR}/lib/xtchain
-    for EXEC in bin2c exetool xtcspecc; do
+    for EXEC in bin2c diskimg exetool xtcspecc; do
         if [ ! -e ${BINDIR}/bin/${EXEC} ]; then
             ${CCOMPILER} ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}
         fi
