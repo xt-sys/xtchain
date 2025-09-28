@@ -5,7 +5,7 @@
 # DEVELOPERS:  Aiken Harris <harraiken91@gmail.com>
 
 # Get the absolute path to the XTchain
-$XTCDIR = (Get-Item -Path ".\").FullName
+$XTCDIR = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 # Read the XTchain version
 $env:XTCVER = Get-Content "${XTCDIR}\Version"
