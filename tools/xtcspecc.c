@@ -14,9 +14,8 @@
 
 #include "xtchain.h"
 
-#define XTCSPECC_VERSION "1.2"
 
-#define ARRAYSIZE(a) (sizeof(a) / sizeof((a)[0]))
+#define XTCSPECC_VERSION "1.2"
 
 typedef struct _STRING
 {
@@ -77,12 +76,12 @@ enum
 
 enum
 {
-    CC_STDCALL,
-    CC_CDECL,
-    CC_FASTCALL,
-    CC_THISCALL,
-    CC_EXTERN,
-    CC_STUB,
+    CCONV_STDCALL,
+    CCONV_CDECL,
+    CCONV_FASTCALL,
+    CCONV_THISCALL,
+    CCONV_EXTERN,
+    CCONV_STUB,
 };
 
 enum
@@ -257,11 +256,11 @@ OutputLine_stub(FILE *file,
     int bRelay = 0;
     int bInPrototype = 0;
 
-    if(pexp->nCallingConvention != CC_STUB &&
+    if(pexp->nCallingConvention != CCONV_STUB &&
        (pexp->uFlags & FL_STUB) == 0)
     {
         /* Only relay trace stdcall C functions */
-        if(!gbTracing || (pexp->nCallingConvention != CC_STDCALL) ||
+        if(!gbTracing || (pexp->nCallingConvention != CCONV_STDCALL) ||
            (pexp->uFlags & FL_NORELAY) ||
            (pexp->strName.buf[0] == '?'))
         {
@@ -294,7 +293,7 @@ OutputLine_stub(FILE *file,
         }
 
         if((giArch == ARCH_X86) &&
-            pexp->nCallingConvention == CC_STDCALL)
+            pexp->nCallingConvention == CCONV_STDCALL)
         {
             fprintf(file, "__stdcall ");
         }
@@ -398,7 +397,7 @@ OutputLine_stub(FILE *file,
     }
     fprintf(file, ");\n");
 
-    if(pexp->nCallingConvention == CC_STUB)
+    if(pexp->nCallingConvention == CCONV_STUB)
     {
         fprintf(file, "\t__wine_spec_unimplemented_stub(\"%s\", __FUNCTION__);\n", pszDllName);
     }
@@ -510,8 +509,8 @@ PrintName(FILE *fileDest,
         fprintf(fileDest, "%.*s", nNameLength, pcName);
     }
     else if(fDeco &&
-            ((pexp->nCallingConvention == CC_STDCALL) ||
-             (pexp->nCallingConvention == CC_FASTCALL)))
+            ((pexp->nCallingConvention == CCONV_STDCALL) ||
+             (pexp->nCallingConvention == CCONV_FASTCALL)))
     {
         /* Scan for a dll forwarding dot */
         pcDot = ScanToken(pcName, '.');
@@ -536,9 +535,9 @@ PrintName(FILE *fileDest,
         else
         {
             /* Print the prefix, but skip it for stdcall */
-            if(pexp->nCallingConvention != CC_STDCALL)
+            if(pexp->nCallingConvention != CCONV_STDCALL)
             {
-                fprintf(fileDest, "%c", pexp->nCallingConvention == CC_FASTCALL ? '@' : '_');
+                fprintf(fileDest, "%c", pexp->nCallingConvention == CCONV_FASTCALL ? '@' : '_');
             }
 
             /* Print the name with trailing decoration */
@@ -581,8 +580,8 @@ OutputLine_def(FILE *fileDest,
             /* If the original name was decorated, use decoration in the forwarder as well */
             if((giArch == ARCH_X86) && ScanToken(pexp->strName.buf, '@') &&
                 !ScanToken(pexp->strTarget.buf, '@') &&
-                ((pexp->nCallingConvention == CC_STDCALL) ||
-                (pexp->nCallingConvention == CC_FASTCALL)) )
+                ((pexp->nCallingConvention == CCONV_STDCALL) ||
+                (pexp->nCallingConvention == CCONV_FASTCALL)) )
             {
                 PrintName(fileDest, pexp, &pexp->strTarget, 1);
             }
@@ -593,13 +592,13 @@ OutputLine_def(FILE *fileDest,
             }
         }
     }
-    else if(((pexp->uFlags & FL_STUB) || (pexp->nCallingConvention == CC_STUB)) &&
+    else if(((pexp->uFlags & FL_STUB) || (pexp->nCallingConvention == CCONV_STUB)) &&
              (pexp->strName.buf[0] == '?'))
     {
         /* C++ stubs are forwarded to C stubs */
         fprintf(fileDest, "=stub_function%d", pexp->nNumber);
     }
-    else if(gbTracing && ((pexp->uFlags & FL_NORELAY) == 0) && (pexp->nCallingConvention == CC_STDCALL) &&
+    else if(gbTracing && ((pexp->uFlags & FL_NORELAY) == 0) && (pexp->nCallingConvention == CCONV_STDCALL) &&
             (pexp->strName.buf[0] != '?'))
     {
         /* Redirect it to the relay-tracing trampoline */
@@ -616,7 +615,7 @@ OutputLine_def(FILE *fileDest,
     {
         fprintf(fileDest, " PRIVATE");
     }
-    else if(pexp->nCallingConvention == CC_EXTERN)
+    else if(pexp->nCallingConvention == CCONV_EXTERN)
     {
         fprintf(fileDest, " DATA");
     }
@@ -798,28 +797,28 @@ ParseFile(char* pcStart,
         /* Now we should get the type */
         if(CompareToken(pc, "stdcall"))
         {
-            exp.nCallingConvention = CC_STDCALL;
+            exp.nCallingConvention = CCONV_STDCALL;
         }
         else if(CompareToken(pc, "cdecl") ||
                  CompareToken(pc, "varargs"))
         {
-            exp.nCallingConvention = CC_CDECL;
+            exp.nCallingConvention = CCONV_CDECL;
         }
         else if(CompareToken(pc, "fastcall"))
         {
-            exp.nCallingConvention = CC_FASTCALL;
+            exp.nCallingConvention = CCONV_FASTCALL;
         }
         else if(CompareToken(pc, "thiscall"))
         {
-            exp.nCallingConvention = CC_THISCALL;
+            exp.nCallingConvention = CCONV_THISCALL;
         }
         else if(CompareToken(pc, "extern"))
         {
-            exp.nCallingConvention = CC_EXTERN;
+            exp.nCallingConvention = CCONV_EXTERN;
         }
         else if(CompareToken(pc, "stub"))
         {
-            exp.nCallingConvention = CC_STUB;
+            exp.nCallingConvention = CCONV_STUB;
         }
         else
         {
@@ -986,8 +985,8 @@ ParseFile(char* pcStart,
 
         /* Handle parameters */
         exp.nStackBytes = 0;
-        if(exp.nCallingConvention != CC_EXTERN &&
-           exp.nCallingConvention != CC_STUB)
+        if(exp.nCallingConvention != CCONV_EXTERN &&
+           exp.nCallingConvention != CCONV_STUB)
         {
             /* Go to next token */
             if(!(pc = NextToken(pc)))
@@ -1069,7 +1068,7 @@ ParseFile(char* pcStart,
         }
 
         /* Handle special stub cases */
-        if(exp.nCallingConvention == CC_STUB)
+        if(exp.nCallingConvention == CCONV_STUB)
         {
             /* Check for c++ mangled name */
             if(pc[0] == '?')
@@ -1093,7 +1092,7 @@ ParseFile(char* pcStart,
                     }
                     exp.nStackBytes = atoi(p + 1);
                     exp.nArgCount =  exp.nStackBytes / 4;
-                    exp.nCallingConvention = CC_STDCALL;
+                    exp.nCallingConvention = CCONV_STDCALL;
                     exp.uFlags |= FL_STUB;
                     for(i = 0; i < exp.nArgCount; i++)
                     {
