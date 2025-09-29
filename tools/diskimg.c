@@ -9,6 +9,98 @@
 #include "xtchain.h"
 
 
+/* Forward references */
+static void CopyData(const char *Image, long Offset, const char *SourceDir, const char *Relative);
+static void CopyImageFile(const char *Image, long Offset, const char *SourceFile, const char *Relative);
+static void MakeDirectory(const char *Image, long Offset, const char *Relative);
+int LoadSector(const char *FileName, uint8_t *Buffer);
+
+
+/* Copies a directory recursively to the image */
+static void CopyData(const char *Image, long Offset, const char *SourceDir, const char *Relative)
+{
+    char Path[2048];
+    struct dirent *Entry;
+    DIR *Directory;
+    struct stat Stat;
+    char new_rel[2048];
+
+    /* Create the directory in the image */
+    if(Relative[0] != '\0')
+    {
+        MakeDirectory(Image, Offset, Relative);
+    }
+
+    /* Open the source directory */
+    Directory = opendir(SourceDir);
+    if(!Directory)
+    {
+        /* Failed to open directory */
+        perror("Failed to open source directory");
+        return;
+    }
+
+    /* Read all entries in the directory */
+    while((Entry = readdir(Directory)))
+    {
+        /* Skip . and .. entries */
+        if(strcmp(Entry->d_name, ".") == 0 || strcmp(Entry->d_name, "..") == 0)
+        {
+            continue;
+        }
+
+        /* Build the full path to the entry */
+        snprintf(Path, sizeof(Path), "%s%c%s", SourceDir, PATH_SEP, Entry->d_name);
+
+        /* Stat the entry */
+        if(stat(Path, &Stat) == -1)
+        {
+            /* Failed to stat entry */
+            perror("Failed to stat file or directory");
+            continue;
+        }
+
+        /* Build the relative path to the entry */
+        if(Relative[0] != '\0')
+        {
+            snprintf(new_rel, sizeof(new_rel), "%s/%s", Relative, Entry->d_name);
+        }
+        else
+        {
+            snprintf(new_rel, sizeof(new_rel), "%s", Entry->d_name);
+        }
+
+        /* Copy the entry to the image */
+        if(S_ISDIR(Stat.st_mode))
+        {
+            /* Entry is a directory, copy it recursively */
+            CopyData(Image, Offset, Path, new_rel);
+        }
+        else if(S_ISREG(Stat.st_mode))
+        {
+            /* Entry is a file, copy it */
+            CopyImageFile(Image, Offset, Path, new_rel);
+        }
+    }
+
+    /* Close the directory */
+    closedir(Directory);
+}
+
+/* Copies a file to the image */
+static void CopyImageFile(const char *Image, long Offset, const char *SourceFile, const char *Relative)
+{
+    char Command[4096];
+
+    /* Copy the file to the image */
+    snprintf(Command, sizeof(Command), "mcopy -i \"%s@@%ld\" \"%s\" \"::/%s\"", Image, Offset, SourceFile, Relative);
+    if(system(Command) != 0)
+    {
+        /* Failed to copy file */
+        fprintf(stderr, "Faile to copy file '%s' to image\n", SourceFile);
+    }
+}
+
 /* Loads a sector from a file */
 int LoadSector(const char *FileName, uint8_t *Buffer)
 {
@@ -50,6 +142,16 @@ int LoadSector(const char *FileName, uint8_t *Buffer)
     return 0;
 }
 
+/* Creates a directory in the image */
+static void MakeDirectory(const char *Image, long Offset, const char *Relative)
+{
+    char Command[4096];
+
+    /* Create the directory in the image */
+    snprintf(Command, sizeof(Command), "mmd -i \"%s@@%ld\" \"::/%s\"", Image, Offset, Relative);
+    system(Command);
+}
+
 /* Main function */
 int main(int argc, char **argv)
 {
@@ -66,11 +168,17 @@ int main(int argc, char **argv)
     const char *FileName = NULL;
     const char *MbrFile = NULL;
     const char *VbrFile = NULL;
+    const char *CopyDir = NULL;
 
     /* Parse command line arguments */
     for(int i = 1; i < argc; i++)
     {
-        if(strcmp(argv[i], "-f") == 0 && i + 1 < argc)
+        if(strcmp(argv[i], "-c") == 0 && i + 1 < argc)
+        {
+            /* Copy directory */
+            CopyDir = argv[++i];
+        }
+        else if(strcmp(argv[i], "-f") == 0 && i + 1 < argc)
         {
             /* Format partition */
             FormatPartition = 1;
@@ -113,7 +221,7 @@ int main(int argc, char **argv)
     if(DiskSizeMB <= 0 || FileName == NULL)
     {
         /* Missing required arguments, print usage */
-        fprintf(stderr, "Usage: %s -s <size_MB> -o <output.img> [-f 16|32] [-m <mbr.img>] [-v <vbr.img>]\n", argv[0]);
+        fprintf(stderr, "Usage: %s -o <output.img> -s <size_MB> [-c <dir>] [-f 16|32] [-m <mbr.img>] [-v <vbr.img>]\n", argv[0]);
         return 1;
     }
 
@@ -229,11 +337,19 @@ int main(int argc, char **argv)
     }
 
     fclose(File);
-    printf("Successfully created disk image '%s' (%ld MB) with bootable W95 FAT-%ld partition%s%s.\n",
+
+    /* Copy files if requested */
+    if(CopyDir)
+    {
+        CopyData(FileName, (long)(Partition.StartLBA * SECTOR_SIZE), CopyDir, "");
+    }
+
+    printf("Successfully created disk image '%s' (%ld MB) with bootable W95 FAT-%ld partition%s%s%s.\n",
            FileName,
            DiskSizeMB,
            FatFormat,
            MbrFile ? ", MBR written" : "",
-           VbrFile ? ", VBR written" : "");
+           VbrFile ? ", VBR written" : "",
+           CopyDir ? ", files copied" : "");
     return 0;
 }

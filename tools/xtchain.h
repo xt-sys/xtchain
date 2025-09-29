@@ -7,12 +7,22 @@
  *              Rafal Kupiec <belliash@codingworkshop.eu.org>
  */
 
+#include <dirent.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
+
+#ifdef _WIN32
+#include <windows.h>
+#define PATH_SEP '\\'
+#else
+#define PATH_SEP '/'
+#endif
 
 #define SECTOR_SIZE     512
 #define _T(x)           x
