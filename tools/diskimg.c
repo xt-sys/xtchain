@@ -4,6 +4,7 @@
  * FILE:        tools/diskimg.c
  * DESCRIPTION: Disk Image manipulation tool
  * DEVELOPERS:  Rafal Kupiec <belliash@codingworkshop.eu.org>
+ *              Aiken Harris <harraiken91@gmail.com>
  */
 
 #include "xtchain.h"
@@ -164,7 +165,8 @@ int main(int argc, char **argv)
     MBR_PARTITION Partition = {0};
     char Zero[SECTOR_SIZE] = {0};
     uint8_t Mbr[SECTOR_SIZE] = {0};
-    uint8_t Vbr[SECTOR_SIZE];
+    uint8_t Vbr[SECTOR_SIZE] = {0};
+    uint8_t ImageVbr[SECTOR_SIZE] = {0};
     const char *FileName = NULL;
     const char *MbrFile = NULL;
     const char *VbrFile = NULL;
@@ -321,11 +323,36 @@ int main(int argc, char **argv)
     /* Write VBR to the start of the partition, if provided */
     if(VbrFile)
     {
-        if (LoadSector(VbrFile, Vbr) != 0) {
+        /* Read the VBR file into memory */
+        if(LoadSector(VbrFile, Vbr) != 0)
+        {
             fclose(File);
             return 1;
         }
-        /* Seek to the start of the partition and write VBR */
+
+        /* Read the existing VBR from the formatted partition to get the correct BPB */
+        fseek(File, Partition.StartLBA * SECTOR_SIZE, SEEK_SET);
+        if(fread(ImageVbr, 1, SECTOR_SIZE, File) != SECTOR_SIZE)
+        {
+            /* Failed to read VBR from disk image */
+            perror("Failed to read BPB from disk image");
+            fclose(File);
+            return 1;
+        }
+
+        /* Copy the BPB from the image's VBR to VBR buffer */
+        if(FatFormat == 32)
+        {
+            /* For FAT32, BPB is larger (up to offset 89) */
+            memcpy(&Vbr[3], &ImageVbr[3], 87);
+        }
+        else
+        {
+            /* For FAT16, BPB is smaller (up to offset 61) */
+            memcpy(&Vbr[3], &ImageVbr[3], 59);
+        }
+
+        /* Write the final, merged VBR to the start of the partition */
         fseek(File, Partition.StartLBA * SECTOR_SIZE, SEEK_SET);
         if(fwrite(Vbr, 1, SECTOR_SIZE, File) != SECTOR_SIZE)
         {
@@ -336,6 +363,7 @@ int main(int argc, char **argv)
         }
     }
 
+    /* Close file */
     fclose(File);
 
     /* Copy files if requested */
