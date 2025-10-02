@@ -36,6 +36,12 @@ typedef struct MBR_PARTITION {
     uint32_t Size;          // Sectors count
 } MBR_PARTITION, *PMBR_PARTITION;
 
+typedef struct _RESERVED_SECTOR_INFO
+{
+    int SectorNumber;
+    const char* Description;
+} RESERVED_SECTOR_INFO, *PRESERVED_SECTOR_INFO;
+
 static
 inline
 char *
