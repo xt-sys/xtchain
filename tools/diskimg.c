@@ -23,7 +23,7 @@ static RESERVED_SECTOR_INFO Fat32ReservedMap[] =
 static void CopyData(const char *Image, long Offset, const char *SourceDir, const char *Relative);
 static void CopyImageFile(const char *Image, long Offset, const char *SourceFile, const char *Relative);
 static long DetermineExtraSector(long sectors_to_write);
-long GetFileSize(const char *FileName);
+long GetSectorFileSize(const char *FileName);
 int LoadSectors(const char *FileName, uint8_t *Buffer, int SectorCount);
 static void MakeDirectory(const char *Image, long Offset, const char *Relative);
 
@@ -158,7 +158,7 @@ static long DetermineExtraSector(long sectors_to_write)
 }
 
 /* Gets the size of a file */
-long GetFileSize(const char *FileName)
+long GetSectorFileSize(const char *FileName)
 {
     FILE *File;
     long Size;
@@ -189,7 +189,7 @@ int LoadSectors(const char *FileName, uint8_t *Buffer, int SectorCount)
     long BytesToRead = SectorCount * SECTOR_SIZE;
 
     /* Get and validate file size */
-    FileSize = GetFileSize(FileName);
+    FileSize = GetSectorFileSize(FileName);
     if(FileSize < 0)
     {
         /* Failed to get file size */
@@ -479,7 +479,7 @@ int main(int argc, char **argv)
     /* Write VBR to the start of the partition, if provided */
     if(VbrFile)
     {
-        VbrFileSize = GetFileSize(VbrFile);
+        VbrFileSize = GetSectorFileSize(VbrFile);
         if(VbrFileSize < 0)
         {
             /* The GetFileSize function already prints a perror message */
