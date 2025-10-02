@@ -10,12 +10,6 @@
 #include "xtchain.h"
 
 
-typedef struct _RESERVED_SECTOR_INFO
-{
-    int SectorNumber;
-    const char* Description;
-} RESERVED_SECTOR_INFO, *PRESERVED_SECTOR_INFO;
-
 static RESERVED_SECTOR_INFO Fat32ReservedMap[] =
 {
     {0, "Main VBR"},
