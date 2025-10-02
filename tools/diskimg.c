@@ -266,7 +266,7 @@ int main(int argc, char **argv)
     Partition.BootFlag = 0x80;
     Partition.Type = (FatFormat == 16) ? 0x06 : 0x0B;
     Partition.StartLBA = 2048;
-    Partition.Size = (DiskSizeBytes / SECTOR_SIZE) - 2048;
+    Partition.Size = (DiskSizeBytes / SECTOR_SIZE) - Partition.StartLBA;
 
     /* Write MBR */
     memcpy(&Mbr[446], &Partition, sizeof(MBR_PARTITION));
@@ -316,6 +316,52 @@ int main(int argc, char **argv)
         if(!File) {
             /* Failed to open file */
             perror("Failed to reopen disk image");
+            return 1;
+        }
+
+        /* Read the VBR created by mformat */
+        fseek(File, Partition.StartLBA * SECTOR_SIZE, SEEK_SET);
+        if(fread(ImageVbr, 1, SECTOR_SIZE, File) != SECTOR_SIZE)
+        {
+            /* Failed to read VBR */
+            perror("Failed to read VBR from disk image");
+            fclose(File);
+            return 1;
+        }
+
+        /* Set the number of hidden sectors, as mformat sets it to 0 */
+        if(*(uint32_t*)&ImageVbr[0x1C] == 0)
+        {
+            memcpy(&ImageVbr[0x1C], &Partition.StartLBA, sizeof(uint32_t));
+        }
+
+        /* Check if parition size exceeds 65535 sectors */
+        if(Partition.Size < 65536)
+        {
+            /* Partition smaller than 32MB (65536 sectors), use 16-bit field TotalSectors16 */
+            if(*(uint16_t*)&ImageVbr[0x13] == 0)
+            {
+                /* Mformat did not set the field, update it */
+                memcpy(&ImageVbr[0x13], &((uint16_t){Partition.Size}), sizeof(uint16_t));
+            }
+        }
+        else
+        {
+            /* Partition larger than 32MB (65536 sectors), use 32-bit field TotalSectors32 */
+            if(*(uint32_t*)&ImageVbr[0x20] == 0)
+            {
+                /* Mformat did not set the field, update it */
+                memcpy(&ImageVbr[0x20], &Partition.Size, sizeof(uint32_t));
+            }
+        }
+
+        /* Write the corrected VBR back to the disk image */
+        fseek(File, Partition.StartLBA * SECTOR_SIZE, SEEK_SET);
+        if(fwrite(ImageVbr, 1, SECTOR_SIZE, File) != SECTOR_SIZE)
+        {
+            /* Failed to write VBR */
+            perror("Failed to write VBR to disk image");
+            fclose(File);
             return 1;
         }
     }
