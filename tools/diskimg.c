@@ -465,6 +465,9 @@ int main(int argc, char **argv)
             }
         }
 
+        /* Set DriveNumber to emulate hard disk */
+        ImageVbr[0x40] = 0x80;
+
         /* Write the corrected VBR back to the disk image */
         fseek(File, Partition.StartLBA * SECTOR_SIZE, SEEK_SET);
         if(fwrite(ImageVbr, 1, SECTOR_SIZE, File) != SECTOR_SIZE)
