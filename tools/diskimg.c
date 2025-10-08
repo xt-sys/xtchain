@@ -244,6 +244,8 @@ int main(int argc, char **argv)
     long FormatPartition = 0;
     long DiskSizeBytes = 0;
     long DiskSizeMB = 0;
+    long MergedSize = 0;
+    long PreloaderSize = 0;
     long SectorsToWrite = 0;
     long VbrExtraSector = -1;
     long VbrFileSize = -1;
@@ -254,9 +256,12 @@ int main(int argc, char **argv)
     char Zero[SECTOR_SIZE] = {0};
     uint8_t Mbr[SECTOR_SIZE] = {0};
     uint8_t ImageVbr[SECTOR_SIZE * 2] = {0};
-    uint8_t *FullVbr = NULL;
+    uint8_t *MergedData = NULL;
+    uint8_t *PreloaderData = NULL;
+    uint8_t *FullVbrData = NULL;
     const char *FileName = NULL;
     const char *MbrFile = NULL;
+    const char *PreloadFile = NULL;
     const char *VbrFile = NULL;
     const char *CopyDir = NULL;
 
@@ -294,6 +299,11 @@ int main(int argc, char **argv)
             /* Output file */
             FileName = argv[++Index];
         }
+        else if(strcmp(argv[Index], "-p") == 0 && Index + 1 < argc)
+        {
+            /* Preloader file */
+            PreloadFile = argv[++Index];
+        }
         else if(strcmp(argv[Index], "-s") == 0 && Index + 1 < argc)
         {
             /* Disk size */
@@ -316,7 +326,15 @@ int main(int argc, char **argv)
     if(DiskSizeMB <= 0 || FileName == NULL)
     {
         /* Missing required arguments, print usage */
-        fprintf(stderr, "Usage: %s -o <output.img> -s <size_MB> [-b <sector>] [-c <dir>] [-f 16|32] [-m <mbr.img>] [-v <vbr.img>]\n", argv[0]);
+        fprintf(stderr, "Usage: %s -o <output.img> -s <size_MB> [-b <sector>] [-c <dir>] [-f 16|32] [-m <mbr.img>] [-p <preload.bin>] [-v <vbr.img>]\n", argv[0]);
+        return 1;
+    }
+
+    /* Validate preload usage */
+    if(PreloadFile && !VbrFile)
+    {
+        /* Preloader code specified without VBR */
+        fprintf(stderr, "Error: Option -p (PRELOADER code) requires -v (VBR code) to be specified as well.\n");
         return 1;
     }
 
@@ -485,7 +503,7 @@ int main(int argc, char **argv)
         VbrFileSize = GetSectorFileSize(VbrFile);
         if(VbrFileSize < 0)
         {
-            /* The GetFileSize function already prints a perror message */
+            /* Unable to determine VBR file size */
             perror("Could not get size of VBR file\n");
             return 1;
         }
@@ -494,27 +512,28 @@ int main(int argc, char **argv)
         if(VbrFileSize % SECTOR_SIZE != 0)
         {
             /* Unable to determine VBR file size */
-            perror("Failed to determine VBR file size");
+            perror("VBR file size is not a multiple of sector size\n");
             return 1;
         }
 
+        /* Calculate number of VBR sectors */
         VbrTotalSectors = VbrFileSize / SECTOR_SIZE;
 
         /* Allocate memory for the entire VBR file */
-        FullVbr = malloc(VbrFileSize);
-        if(!FullVbr)
+        FullVbrData = malloc(VbrFileSize);
+        if(!FullVbrData)
         {
             /* Memory allocation failed */
-            perror("Failed to allocate memory for VBR file");
+            perror("Failed to allocate memory for VBR file\n");
             return 1;
         }
 
         /* Read the entire VBR file into the buffer */
-        if(LoadSectors(VbrFile, FullVbr, VbrTotalSectors) != 0)
+        if(LoadSectors(VbrFile, FullVbrData, VbrTotalSectors) != 0)
         {
             /* Failed to load VBR from file */
-            perror("Failed to load VBR from file");
-            free(FullVbr);
+            perror("Failed to load VBR from file\n");
+            free(FullVbrData);
             return 1;
         }
 
@@ -523,8 +542,8 @@ int main(int argc, char **argv)
         if(fread(ImageVbr, 1, SECTOR_SIZE, File) != SECTOR_SIZE)
         {
             /* Failed to read VBR from disk image */
-            perror("Failed to read BPB from disk image");
-            free(FullVbr);
+            perror("Failed to read BPB from disk image\n");
+            free(FullVbrData);
             fclose(File);
             return 1;
         }
@@ -533,21 +552,21 @@ int main(int argc, char **argv)
         if(FatFormat == 32)
         {
             /* For FAT32, BPB is larger (up to offset 89) */
-            memcpy(&FullVbr[3], &ImageVbr[3], 87);
+            memcpy(&FullVbrData[3], &ImageVbr[3], 87);
         }
         else
         {
             /* For FAT16, BPB is smaller (up to offset 61) */
-            memcpy(&FullVbr[3], &ImageVbr[3], 59);
+            memcpy(&FullVbrData[3], &ImageVbr[3], 59);
         }
 
         /* Write the first 512 bytes of the final, merged VBR to the start of the partition */
         fseek(File, Partition.StartLBA * SECTOR_SIZE, SEEK_SET);
-        if(fwrite(FullVbr, 1, SECTOR_SIZE, File) != SECTOR_SIZE)
+        if(fwrite(FullVbrData, 1, SECTOR_SIZE, File) != SECTOR_SIZE)
         {
             /* Failed to write VBR to disk image */
-            perror("Failed to write VBR to disk image");
-            free(FullVbr);
+            perror("Failed to write VBR to disk image\n");
+            free(FullVbrData);
             fclose(File);
             return 1;
         }
@@ -555,6 +574,72 @@ int main(int argc, char **argv)
         /* Handle extra VBR data if it exists */
         if(FatFormat == 32)
         {
+            /* Check if a preloader file was provided */
+            if(PreloadFile)
+            {
+                /* Get the size of the preloader file */
+                PreloaderSize = GetSectorFileSize(PreloadFile);
+                if(PreloaderSize < 0)
+                {
+                    /* Unable to determine preloader file size */
+                    perror("Could not get size of preloader file.\n");
+                    free(FullVbrData);
+                    return 1;
+                }
+
+                /* Check if preloader size is multiple of 512 bytes */
+                if(PreloaderSize % SECTOR_SIZE != 0)
+                {
+                    /* Preloader file size is not a multiple of 512 bytes */
+                    perror("Preloader file size is not a multiple of sector size\n");
+                    free(FullVbrData);
+                    return 1;
+                }
+
+                /* Allocate buffer for preloader */
+                PreloaderData = malloc((size_t)PreloaderSize);
+                if(!PreloaderData)
+                {
+                    /* Memory allocation failed */
+                    perror("Failed to allocate memory for preloader");
+                    free(FullVbrData);
+                    return 1;
+                }
+
+                /* Load preloader data */
+                if(LoadSectors(PreloadFile, PreloaderData, PreloaderSize / SECTOR_SIZE) != 0)
+                {
+                    /* Failed to load preloader data */
+                    perror("Failed to load Preloader code from file\n");
+                    free(FullVbrData);
+                    return 1;
+                }
+
+                /* Allocate new buffer for the first 512 bytes of VBR and preloader */
+                MergedSize = SECTOR_SIZE + PreloaderSize;
+                MergedData = malloc(MergedSize);
+                if(!MergedData)
+                {
+                    /* Memory allocation failed */
+                    perror("Failed to allocate memory for Preloader file\n");
+                    free(PreloaderData);
+                    free(FullVbrData);
+                    return 1;
+                }
+
+                /* Merge VBR and preloader data */
+                memcpy(MergedData, FullVbrData, SECTOR_SIZE);
+                memcpy(MergedData + SECTOR_SIZE, PreloaderData, PreloaderSize);
+
+                /* Free old buffers and replace with merged data */
+                free(FullVbrData);
+                free(PreloaderData);
+                FullVbrData = MergedData;
+
+                /* Update VBR sectors count */
+                VbrTotalSectors = (MergedSize + SECTOR_SIZE - 1) / SECTOR_SIZE;
+            }
+
             /* Check if there is extra VBR data to write */
             if(VbrTotalSectors > 1)
             {
@@ -569,7 +654,7 @@ int main(int argc, char **argv)
                         /* Failed to find a safe sector */
                         fprintf(stderr, "Error: Could not automatically find a safe space in the FAT32 reserved region for %ld extra VBR sectors.\n",
                                 sectors_to_write);
-                        free(FullVbr);
+                        free(FullVbrData);
                         return 1;
                     }
                 }
@@ -583,7 +668,7 @@ int main(int argc, char **argv)
                 {
                     /* The remaining space is not large enough to fit the extra VBR data */
                     fprintf(stderr, "Error: VBR file is too large. Writing to sector %ld would exceed the FAT32 reserved region (32 sectors).\n", VbrLastSector);
-                    free(FullVbr);
+                    free(FullVbrData);
                     return 1;
                 }
 
@@ -596,18 +681,18 @@ int main(int argc, char **argv)
                         /* We are about to overwrite a critical sector */
                         fprintf(stderr, "Error: Writing VBR extra data would overwrite critical sector %d (%s).\n",
                                 Fat32ReservedMap[Index].SectorNumber, Fat32ReservedMap[Index].Description);
-                        free(FullVbr);
+                        free(FullVbrData);
                         return 1;
                     }
                 }
 
                 /* Write the rest of the VBR data */
                 fseek(File, (Partition.StartLBA + VbrExtraSector) * SECTOR_SIZE, SEEK_SET);
-                if(fwrite(FullVbr + SECTOR_SIZE, 1, SectorsToWrite * SECTOR_SIZE, File) != (size_t)(SectorsToWrite * SECTOR_SIZE))
+                if(fwrite(FullVbrData + SECTOR_SIZE, 1, SectorsToWrite * SECTOR_SIZE, File) != (size_t)(SectorsToWrite * SECTOR_SIZE))
                 {
                     /* Failed to write extra VBR data to disk image */
                     perror("Failed to write extra VBR data to disk image");
-                    free(FullVbr);
+                    free(FullVbrData);
                     fclose(File);
                     return 1;
                 }
@@ -616,17 +701,17 @@ int main(int argc, char **argv)
         else /* FatFormat == 16 */
         {
             /* Check if there is extra VBR data to write */
-            if(VbrTotalSectors > 1)
+            if(VbrTotalSectors > 1 || PreloadFile)
             {
                 /* FAT16 only supports a 1-sector VBR */
-                fprintf(stderr, "Error: VBR file is %ld sectors, but FAT16 only supports a 1-sector VBR.\n", VbrTotalSectors);
-                free(FullVbr);
+                fprintf(stderr, "Error: FAT16 does not support multi-sector VBR or preloader data.\n");
+                free(FullVbrData);
                 return 1;
             }
         }
 
         /* Free allocated memory */
-        free(FullVbr);
+        free(FullVbrData);
     }
 
     /* Close file */
@@ -644,8 +729,16 @@ int main(int argc, char **argv)
         /* Compose VBR info string */
         if(VbrExtraSector != -1)
         {
-            /* VBR with extra data */
-            snprintf(VbrInfo, sizeof(VbrInfo), ", VBR written (extra data at sector %ld)", VbrExtraSector);
+            if(PreloadFile)
+            {
+                /* Preloader written */
+                snprintf(VbrInfo, sizeof(VbrInfo), ", VBR written (preloader at sector %ld)", VbrExtraSector);
+            }
+            else
+            {
+                /* VBR with extra data */
+                snprintf(VbrInfo, sizeof(VbrInfo), ", VBR written (extra data at sector %ld)", VbrExtraSector);
+            }
         }
         else
         {
