@@ -26,12 +26,12 @@ TARGET_SYSTEM=linux
 
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
-CMAKETAG="v4.1.1"
+CMAKETAG="v4.2.0"
 CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-21.1.5"
+LLVMTAG="llvmorg-21.1.6"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Mtools Settings
@@ -41,12 +41,12 @@ MTOOLSVCS="https://github.com/xt-sys/mtools.git"
 
 # Ninja Settings
 NINJADIR="${SRCDIR}/ninja"
-NINJATAG="v1.13.1"
+NINJATAG="v1.13.2"
 NINJAVCS="https://github.com/ninja-build/ninja.git"
 
 # Wine Settings
 WINEDIR="${SRCDIR}/wine"
-WINETAG="wine-10.15"
+WINETAG="wine-10.19"
 WINEVCS="https://github.com/wine-mirror/wine.git"
 
 
