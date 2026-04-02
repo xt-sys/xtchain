@@ -50,7 +50,8 @@ void ProcessSourceFile(FILE* InFile, FILE* OutFile)
                 }
 
                 /* Generate the corresponding C-preprocessor macro definition */
-                fprintf(OutFile, "#define %s %s\n", SymbolName, ValuePointer);
+                fprintf(OutFile, "#undef %s\n", SymbolName);
+                fprintf(OutFile, "#define %s %s\n\n", SymbolName, ValuePointer);
             }
         }
     }
