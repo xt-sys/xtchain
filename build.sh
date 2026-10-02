@@ -26,12 +26,12 @@ TARGET_SYSTEM=linux
 
 # CMake Settings
 CMAKEDIR="${SRCDIR}/cmake"
-CMAKETAG="v4.2.0"
+CMAKETAG="v4.4.3"
 CMAKEVCS="https://gitlab.kitware.com/cmake/cmake.git"
 
 # LLVM Settings
 LLVMDIR="${SRCDIR}/llvm"
-LLVMTAG="llvmorg-22.1.6"
+LLVMTAG="llvmorg-23.1.2"
 LLVMVCS="https://github.com/llvm/llvm-project.git"
 
 # Mtools Settings
@@ -408,9 +408,9 @@ xtchain_build()
     echo ">>> Building XTchain tools ..."
     mkdir -p ${BINDIR}/bin
     mkdir -p ${BINDIR}/lib/xtchain
-    for EXEC in bin2c diskimg exetool xtadkgen xtcspecc; do
+    for EXEC in bin2c diskimg exetool xtadkgen xtcspecc xtnlsc; do
         if [ ! -e ${BINDIR}/bin/${EXEC} ]; then
-            ${CCOMPILER} ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}
+            ${CCOMPILER} -I${WRKDIR}/tools/includes ${WRKDIR}/tools/${EXEC}.c -o ${BINDIR}/bin/${EXEC}
         fi
     done
     cp ${WRKDIR}/scripts/xtclib* ${BINDIR}/lib/xtchain/
